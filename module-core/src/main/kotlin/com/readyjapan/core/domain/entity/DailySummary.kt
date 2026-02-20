@@ -4,6 +4,7 @@ import com.readyjapan.core.domain.entity.enums.SummaryStatus
 import jakarta.persistence.*
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 /**
  * 일간 요약 엔티티
@@ -56,7 +57,7 @@ class DailySummary(
      */
     fun markAsSent() {
         this.status = SummaryStatus.SENT
-        this.sentAt = LocalDateTime.now()
+        this.sentAt = LocalDateTime.now(JST)
     }
 
     /**
@@ -71,8 +72,8 @@ class DailySummary(
      */
     fun updateSummary(
         summaryContent: String,
-        trendingTopics: String? = null,
-        keyHighlights: String? = null
+        trendingTopics: String?,
+        keyHighlights: String?
     ) {
         this.summaryContent = summaryContent
         this.trendingTopics = trendingTopics
@@ -107,12 +108,14 @@ class DailySummary(
     }
 
     companion object {
+        private val JST = ZoneId.of("Asia/Tokyo")
+
         /**
-         * 오늘 날짜로 새 요약 생성
+         * 오늘 날짜(JST)로 새 요약 생성
          */
         fun createForToday(summaryContent: String): DailySummary {
             return DailySummary(
-                summaryDate = LocalDate.now(),
+                summaryDate = LocalDate.now(JST),
                 summaryContent = summaryContent
             )
         }

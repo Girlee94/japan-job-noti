@@ -1,10 +1,12 @@
 package com.readyjapan.infrastructure.crawler.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.stereotype.Component
 
 /**
  * 크롤러 공통 설정
  */
+@Component
 @ConfigurationProperties(prefix = "app.crawler")
 data class CrawlerConfig(
     /** User-Agent 헤더 */

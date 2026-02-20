@@ -37,7 +37,7 @@ CREATE INDEX idx_crawl_sources_type ON crawl_sources(source_type);
 -- ============================================
 CREATE TABLE IF NOT EXISTS job_postings (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE CASCADE,
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     title VARCHAR(500) NOT NULL,
     title_translated VARCHAR(500),
@@ -76,7 +76,7 @@ CREATE INDEX idx_job_postings_language ON job_postings(language);
 -- ============================================
 CREATE TABLE IF NOT EXISTS news_articles (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE CASCADE,
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     title VARCHAR(500) NOT NULL,
     title_translated VARCHAR(500),
@@ -108,7 +108,7 @@ CREATE INDEX idx_news_articles_language ON news_articles(language);
 -- ============================================
 CREATE TABLE IF NOT EXISTS community_posts (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE CASCADE,
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     platform VARCHAR(20) NOT NULL,
     title VARCHAR(500),
@@ -148,7 +148,7 @@ CREATE INDEX idx_community_posts_language ON community_posts(language);
 -- ============================================
 CREATE TABLE IF NOT EXISTS crawl_histories (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE CASCADE,
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     status VARCHAR(20) NOT NULL,
     items_found INT DEFAULT 0 NOT NULL,
     items_saved INT DEFAULT 0 NOT NULL,

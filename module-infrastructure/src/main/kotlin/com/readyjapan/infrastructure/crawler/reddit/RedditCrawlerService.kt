@@ -45,7 +45,6 @@ class RedditCrawlerService(
     /**
      * 모든 활성화된 Reddit 소스 크롤링
      */
-    @Transactional
     fun crawlAllSources(): List<CrawlHistory> {
         if (!redditApiClient.isEnabled()) {
             logger.warn { "Reddit API is not enabled or configured" }
@@ -69,8 +68,8 @@ class RedditCrawlerService(
 
     /**
      * 특정 소스 크롤링
+     * HTTP 호출은 트랜잭션 밖에서 수행하고, DB 저장만 트랜잭션 내에서 처리
      */
-    @Transactional
     fun crawlSource(source: CrawlSource): CrawlHistory {
         val history = CrawlHistory.start(source)
         crawlHistoryRepository.save(history)
@@ -86,6 +85,7 @@ class RedditCrawlerService(
 
             logger.info { "Crawling r/$subreddit (sort: $sort, limit: $limit)" }
 
+            // HTTP 호출 (트랜잭션 밖에서 수행)
             val response = redditApiClient.getSubredditPosts(subreddit, sort, limit)
                 .block()
 
@@ -98,20 +98,8 @@ class RedditCrawlerService(
                 .map { it.data }
                 .filter { isRelevantPost(it) }
 
-            var savedCount = 0
-            var updatedCount = 0
-
-            for (postData in posts) {
-                val result = saveOrUpdatePost(source, postData)
-                when (result) {
-                    SaveResult.SAVED -> savedCount++
-                    SaveResult.UPDATED -> updatedCount++
-                    SaveResult.SKIPPED -> { /* no-op */ }
-                }
-            }
-
-            source.updateLastCrawledAt()
-            crawlSourceRepository.save(source)
+            // DB 저장 (트랜잭션 내에서 수행)
+            val (savedCount, updatedCount) = saveCrawledPosts(source, posts)
 
             history.complete(
                 itemsFound = posts.size,
@@ -130,6 +118,29 @@ class RedditCrawlerService(
         }
 
         return crawlHistoryRepository.save(history)
+    }
+
+    /**
+     * 크롤링된 게시물들을 트랜잭션 내에서 저장
+     */
+    @Transactional
+    fun saveCrawledPosts(source: CrawlSource, posts: List<RedditPostData>): Pair<Int, Int> {
+        var savedCount = 0
+        var updatedCount = 0
+
+        for (postData in posts) {
+            val result = saveOrUpdatePost(source, postData)
+            when (result) {
+                SaveResult.SAVED -> savedCount++
+                SaveResult.UPDATED -> updatedCount++
+                SaveResult.SKIPPED -> { /* no-op */ }
+            }
+        }
+
+        source.updateLastCrawledAt()
+        crawlSourceRepository.save(source)
+
+        return Pair(savedCount, updatedCount)
     }
 
     /**

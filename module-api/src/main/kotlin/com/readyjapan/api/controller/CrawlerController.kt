@@ -6,7 +6,10 @@ import com.readyjapan.core.domain.repository.CommunityPostRepository
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Tag(name = "Crawler", description = "크롤링 관리 API")
 @RestController
@@ -15,10 +18,20 @@ class CrawlerController(
     private val redditCrawlerService: RedditCrawlerService,
     private val communityPostRepository: CommunityPostRepository
 ) {
+    private val crawlInProgress = AtomicBoolean(false)
+
     @Operation(summary = "수동 크롤링 실행", description = "Reddit 크롤링을 수동으로 실행합니다.")
     @PostMapping("/reddit/run")
     fun runRedditCrawl(): ApiResponse<CrawlResultResponse> {
-        val histories = redditCrawlerService.crawlAllSources()
+        if (!crawlInProgress.compareAndSet(false, true)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "크롤링이 이미 실행 중입니다.")
+        }
+
+        val histories = try {
+            redditCrawlerService.crawlAllSources()
+        } finally {
+            crawlInProgress.set(false)
+        }
 
         val result = CrawlResultResponse(
             sourcesProcessed = histories.size,

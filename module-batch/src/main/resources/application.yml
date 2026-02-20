@@ -9,8 +9,8 @@ spring:
     driver-class-name: org.postgresql.Driver
     # Supabase PostgreSQL (Transaction Pooler 사용)
     url: ${DATABASE_URL:jdbc:postgresql://localhost:6543/postgres}
-    username: ${DB_USERNAME:postgres.${POOLER_TENANT_ID:your-tenant-id}}
-    password: ${DB_PASSWORD:your-super-secret-and-long-postgres-password}
+    username: ${DB_USERNAME:CHANGE_ME_DB_USERNAME}
+    password: ${DB_PASSWORD:CHANGE_ME_DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
