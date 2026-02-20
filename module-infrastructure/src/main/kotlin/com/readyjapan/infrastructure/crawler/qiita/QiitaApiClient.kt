@@ -1,15 +1,20 @@
 package com.readyjapan.infrastructure.crawler.qiita
 
 import com.readyjapan.core.common.exception.ExternalApiException
+import com.readyjapan.infrastructure.crawler.config.CrawlerConfig
 import com.readyjapan.infrastructure.crawler.qiita.dto.QiitaItemResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.netty.channel.ChannelOption
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.http.HttpHeaders
+import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Mono
+import reactor.netty.http.client.HttpClient
+import java.time.Duration
 
 private val logger = KotlinLogging.logger {}
 
@@ -21,11 +26,19 @@ private val logger = KotlinLogging.logger {}
 @EnableConfigurationProperties(QiitaProperties::class)
 class QiitaApiClient(
     private val properties: QiitaProperties,
+    crawlerConfig: CrawlerConfig,
     webClientBuilder: WebClient.Builder
 ) {
     private val apiClient: WebClient = webClientBuilder
         .baseUrl("https://qiita.com")
         .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+        .clientConnector(
+            ReactorClientHttpConnector(
+                HttpClient.create()
+                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (crawlerConfig.timeoutSeconds * 1000).toInt())
+                    .responseTimeout(Duration.ofSeconds(crawlerConfig.timeoutSeconds))
+            )
+        )
         .apply {
             if (properties.accessToken.isNotBlank()) {
                 it.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${properties.accessToken}")
@@ -50,12 +63,17 @@ class QiitaApiClient(
             return Mono.just(emptyList())
         }
 
-        val uri = "/api/v2/items?query=tag:$tag&page=$page&per_page=$perPage"
-
-        logger.debug { "Fetching Qiita items: $uri" }
+        logger.debug { "Fetching Qiita items: tag=$tag, page=$page, perPage=$perPage" }
 
         return apiClient.get()
-            .uri(uri)
+            .uri { builder ->
+                builder
+                    .path("/api/v2/items")
+                    .queryParam("query", "tag:$tag")
+                    .queryParam("page", page)
+                    .queryParam("per_page", perPage)
+                    .build()
+            }
             .retrieve()
             .bodyToMono(object : ParameterizedTypeReference<List<QiitaItemResponse>>() {})
             .doOnNext { items ->

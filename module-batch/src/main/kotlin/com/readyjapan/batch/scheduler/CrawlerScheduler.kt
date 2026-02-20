@@ -77,8 +77,18 @@ class CrawlerScheduler(
     fun manualCrawl(): CrawlResult {
         logger.info { "Starting manual crawl (Reddit + Qiita)" }
 
-        val redditHistories = redditCrawlerService.crawlAllSources()
-        val qiitaHistories = qiitaCrawlerService.crawlAllSources()
+        val redditHistories = try {
+            redditCrawlerService.crawlAllSources()
+        } catch (e: Exception) {
+            logger.error(e) { "Reddit crawl failed during manual crawl" }
+            emptyList()
+        }
+        val qiitaHistories = try {
+            qiitaCrawlerService.crawlAllSources()
+        } catch (e: Exception) {
+            logger.error(e) { "Qiita crawl failed during manual crawl" }
+            emptyList()
+        }
         val allHistories = redditHistories + qiitaHistories
 
         return CrawlResult(

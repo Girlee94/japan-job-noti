@@ -16,6 +16,12 @@ interface JpaCommunityPostRepository : JpaRepository<CommunityPost, Long> {
         @Param("externalId") externalId: String
     ): CommunityPost?
 
+    @Query("SELECT c FROM CommunityPost c WHERE c.source.id = :sourceId AND c.externalId IN :externalIds")
+    fun findAllBySourceIdAndExternalIdIn(
+        @Param("sourceId") sourceId: Long,
+        @Param("externalIds") externalIds: List<String>
+    ): List<CommunityPost>
+
     fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost>
 
     @Query("SELECT c FROM CommunityPost c WHERE c.createdAt > :dateTime ORDER BY c.createdAt DESC")
