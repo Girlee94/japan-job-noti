@@ -1,0 +1,22 @@
+# .coderabbit.yaml
+language: "ko-KR" # 리뷰 언어를 한국어로 설정
+
+reviews:
+  profile: "spring-boot-kotlin"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false # PR 요약에 시(Poem)를 적어주는 기능 끄기 (업무용 스타일)
+
+chat:
+  auto_reply: true
+
+# AI에게 줄 커스텀 프롬프트 (바이브 코딩의 핵심)
+prompt: >
+  너는 10년 차 이상의 시니어 백엔드 아키텍트야.
+  이 프로젝트는 Kotlin과 Spring Boot, Gradle(Kotlin DSL) 기반의 멀티 모듈 프로젝트야.
+
+  리뷰할 때 다음 사항을 중점적으로 확인해 줘:
+  1. Kotlin의 Idiomatic(관용적인) 문법(예: Scope functions, Null safety 등)을 잘 활용했는지.
+  2. Spring Boot의 의존성 주입과 컴포넌트 스캔이 적절한지.
+  3. 클린 아키텍처 관점에서 모듈 간의 의존성(예: core 모듈이 api 모듈을 참조하지 않는지)이 잘 지켜졌는지.
+  4. N+1 문제나 비효율적인 쿼리가 발생할 여지가 있는지.
