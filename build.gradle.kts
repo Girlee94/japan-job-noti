@@ -35,6 +35,8 @@ subprojects {
         // Test
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("io.mockk:mockk:1.13.14")
+        testImplementation("io.kotest:kotest-runner-junit5:${property("kotestVersion")}")
+        testImplementation("io.kotest:kotest-assertions-core:${property("kotestVersion")}")
         testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     }
 
