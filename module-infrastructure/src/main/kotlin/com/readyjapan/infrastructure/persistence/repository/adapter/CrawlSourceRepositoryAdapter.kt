@@ -1,6 +1,7 @@
 package com.readyjapan.infrastructure.persistence.repository.adapter
 
 import com.readyjapan.core.domain.entity.CrawlSource
+import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.SourceType
 import com.readyjapan.core.domain.repository.CrawlSourceRepository
 import com.readyjapan.infrastructure.persistence.repository.JpaCrawlSourceRepository
@@ -22,6 +23,9 @@ class CrawlSourceRepositoryAdapter(
 
     override fun findEnabledBySourceType(sourceType: SourceType): List<CrawlSource> =
         jpa.findEnabledBySourceType(sourceType)
+
+    override fun findEnabledBySourceTypeAndPlatform(sourceType: SourceType, platform: CommunityPlatform): List<CrawlSource> =
+        jpa.findEnabledBySourceTypeAndPlatform(sourceType, platform)
 
     override fun save(crawlSource: CrawlSource): CrawlSource = jpa.save(crawlSource)
 

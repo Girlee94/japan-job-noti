@@ -10,7 +10,6 @@ import com.readyjapan.core.domain.repository.CrawlSourceRepository
 import com.readyjapan.infrastructure.crawler.qiita.dto.QiitaItemResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
 
 private val logger = KotlinLogging.logger {}
@@ -18,9 +17,11 @@ private val logger = KotlinLogging.logger {}
 /**
  * Qiita 크롤링 서비스
  * Qiita API v2를 통해 태그별 기사를 수집하고 저장합니다.
+ *
+ * 트랜잭션 관리는 QiitaItemPersistenceService에 위임하며,
+ * 이 클래스 자체는 트랜잭션을 선언하지 않는다 (HTTP 호출이 포함되어 있으므로).
  */
 @Service
-@Transactional(readOnly = true)
 class QiitaCrawlerService(
     private val qiitaApiClient: QiitaApiClient,
     private val qiitaProperties: QiitaProperties,
@@ -42,8 +43,9 @@ class QiitaCrawlerService(
             return emptyList()
         }
 
-        val sources = crawlSourceRepository.findEnabledBySourceType(SourceType.COMMUNITY)
-            .filter { it.platform == CommunityPlatform.QIITA }
+        val sources = crawlSourceRepository.findEnabledBySourceTypeAndPlatform(
+            SourceType.COMMUNITY, CommunityPlatform.QIITA
+        )
 
         if (sources.isEmpty()) {
             logger.info { "No active Qiita sources found" }
@@ -61,7 +63,6 @@ class QiitaCrawlerService(
      * 특정 소스 크롤링
      * HTTP 호출은 트랜잭션 밖에서 수행하고, DB 저장은 PersistenceService를 통해 별도 트랜잭션에서 처리
      */
-    @Transactional
     fun crawlSource(source: CrawlSource): CrawlHistory {
         val history = CrawlHistory.start(source)
         crawlHistoryRepository.save(history)
@@ -76,11 +77,18 @@ class QiitaCrawlerService(
             // HTTP 호출 (트랜잭션 밖에서 수행)
             val allItems = mutableListOf<QiitaItemResponse>()
             for (tag in tags) {
-                val items = qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit)
-                    .block(Duration.ofSeconds(API_TIMEOUT_SECONDS))
+                val items = try {
+                    qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit)
+                        .block(Duration.ofSeconds(API_TIMEOUT_SECONDS))
+                } catch (e: Exception) {
+                    logger.warn(e) { "Failed to fetch items for tag: $tag" }
+                    null
+                }
 
                 if (items != null) {
                     allItems.addAll(items)
+                } else {
+                    logger.warn { "No items returned for tag: $tag (timeout or null response)" }
                 }
 
                 // Rate limit 방지 딜레이

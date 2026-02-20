@@ -27,6 +27,8 @@ class QiitaItemPersistenceService(
 ) {
     companion object {
         private val JST_ZONE = ZoneId.of("Asia/Tokyo")
+        private val JAPANESE_PATTERN = Regex("[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FAF]")
+        private val KOREAN_PATTERN = Regex("[\\uAC00-\\uD7AF\\u1100-\\u11FF]")
     }
 
     /**
@@ -48,8 +50,8 @@ class QiitaItemPersistenceService(
             .findAllBySourceIdAndExternalIdIn(source.id, externalIds)
             .associateBy { it.externalId }
 
-        var savedCount = 0
-        var updatedCount = 0
+        val toUpdate = mutableListOf<CommunityPost>()
+        val toInsert = mutableListOf<CommunityPost>()
 
         for (item in items) {
             val existing = existingMap[item.id]
@@ -62,8 +64,7 @@ class QiitaItemPersistenceService(
                         commentCount = item.commentsCount,
                         shareCount = null
                     )
-                    communityPostRepository.save(existing)
-                    updatedCount++
+                    toUpdate.add(existing)
                 }
             } else {
                 val content = item.body?.takeIf { it.isNotBlank() }
@@ -85,15 +86,21 @@ class QiitaItemPersistenceService(
                     publishedAt = parseDateTime(item.createdAt)
                 )
 
-                communityPostRepository.save(post)
-                savedCount++
+                toInsert.add(post)
             }
+        }
+
+        if (toUpdate.isNotEmpty()) {
+            communityPostRepository.saveAll(toUpdate)
+        }
+        if (toInsert.isNotEmpty()) {
+            communityPostRepository.saveAll(toInsert)
         }
 
         source.updateLastCrawledAt()
         crawlSourceRepository.save(source)
 
-        return Pair(savedCount, updatedCount)
+        return Pair(toInsert.size, toUpdate.size)
     }
 
     /**
@@ -102,11 +109,8 @@ class QiitaItemPersistenceService(
     private fun detectLanguage(title: String, content: String): String {
         val text = "$title $content"
 
-        val japanesePattern = Regex("[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FAF]")
-        val koreanPattern = Regex("[\\uAC00-\\uD7AF\\u1100-\\u11FF]")
-
-        val japaneseCount = japanesePattern.findAll(text).count()
-        val koreanCount = koreanPattern.findAll(text).count()
+        val japaneseCount = JAPANESE_PATTERN.findAll(text).count()
+        val koreanCount = KOREAN_PATTERN.findAll(text).count()
 
         return when {
             koreanCount > japaneseCount && koreanCount > 5 -> "ko"
@@ -124,7 +128,7 @@ class QiitaItemPersistenceService(
                 .atZoneSameInstant(JST_ZONE)
                 .toLocalDateTime()
         } catch (e: Exception) {
-            logger.warn { "Failed to parse datetime: $dateTimeStr, using now()" }
+            logger.warn(e) { "Failed to parse datetime: $dateTimeStr, using now()" }
             LocalDateTime.now(JST_ZONE)
         }
     }
