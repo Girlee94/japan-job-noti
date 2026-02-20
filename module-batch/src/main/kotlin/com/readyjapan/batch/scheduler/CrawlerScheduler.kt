@@ -1,5 +1,6 @@
 package com.readyjapan.batch.scheduler
 
+import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -13,7 +14,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class CrawlerScheduler(
-    private val redditCrawlerService: RedditCrawlerService
+    private val redditCrawlerService: RedditCrawlerService,
+    private val qiitaCrawlerService: QiitaCrawlerService
 ) {
     /**
      * Reddit 크롤링 (매일 오전 8시, 오후 6시)
@@ -43,19 +45,48 @@ class CrawlerScheduler(
     }
 
     /**
+     * Qiita 크롤링 (매일 오전 9시, 오후 7시)
+     * JST 기준
+     */
+    @Scheduled(cron = "0 0 9,19 * * *", zone = "Asia/Tokyo")
+    fun scheduledQiitaCrawl() {
+        logger.info { "Starting scheduled Qiita crawl" }
+
+        try {
+            val histories = qiitaCrawlerService.crawlAllSources()
+
+            val totalFound = histories.sumOf { it.itemsFound }
+            val totalSaved = histories.sumOf { it.itemsSaved }
+            val totalUpdated = histories.sumOf { it.itemsUpdated }
+
+            logger.info {
+                "Scheduled Qiita crawl completed: " +
+                        "sources=${histories.size}, " +
+                        "found=$totalFound, " +
+                        "saved=$totalSaved, " +
+                        "updated=$totalUpdated"
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Scheduled Qiita crawl failed" }
+        }
+    }
+
+    /**
      * 수동 크롤링 실행 (테스트용)
      */
     fun manualCrawl(): CrawlResult {
-        logger.info { "Starting manual Reddit crawl" }
+        logger.info { "Starting manual crawl (Reddit + Qiita)" }
 
-        val histories = redditCrawlerService.crawlAllSources()
+        val redditHistories = redditCrawlerService.crawlAllSources()
+        val qiitaHistories = qiitaCrawlerService.crawlAllSources()
+        val allHistories = redditHistories + qiitaHistories
 
         return CrawlResult(
-            sourcesProcessed = histories.size,
-            totalFound = histories.sumOf { it.itemsFound },
-            totalSaved = histories.sumOf { it.itemsSaved },
-            totalUpdated = histories.sumOf { it.itemsUpdated },
-            failedSources = histories.count { !it.isSuccessful() }
+            sourcesProcessed = allHistories.size,
+            totalFound = allHistories.sumOf { it.itemsFound },
+            totalSaved = allHistories.sumOf { it.itemsSaved },
+            totalUpdated = allHistories.sumOf { it.itemsUpdated },
+            failedSources = allHistories.count { !it.isSuccessful() }
         )
     }
 

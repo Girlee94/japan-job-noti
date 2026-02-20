@@ -3,6 +3,7 @@ package com.readyjapan.api.controller
 import com.readyjapan.core.common.response.ApiResponse
 import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.repository.CommunityPostRepository
+import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -16,9 +17,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RequestMapping("/api/crawler")
 class CrawlerController(
     private val redditCrawlerService: RedditCrawlerService,
+    private val qiitaCrawlerService: QiitaCrawlerService,
     private val communityPostRepository: CommunityPostRepository
 ) {
     private val crawlInProgress = AtomicBoolean(false)
+    private val qiitaCrawlInProgress = AtomicBoolean(false)
 
     @Operation(summary = "수동 크롤링 실행", description = "Reddit 크롤링을 수동으로 실행합니다.")
     @PostMapping("/reddit/run")
@@ -42,6 +45,30 @@ class CrawlerController(
         )
 
         return ApiResponse.success(result, "크롤링이 완료되었습니다.")
+    }
+
+    @Operation(summary = "Qiita 수동 크롤링 실행", description = "Qiita 크롤링을 수동으로 실행합니다.")
+    @PostMapping("/qiita/run")
+    fun runQiitaCrawl(): ApiResponse<CrawlResultResponse> {
+        if (!qiitaCrawlInProgress.compareAndSet(false, true)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Qiita 크롤링이 이미 실행 중입니다.")
+        }
+
+        val histories = try {
+            qiitaCrawlerService.crawlAllSources()
+        } finally {
+            qiitaCrawlInProgress.set(false)
+        }
+
+        val result = CrawlResultResponse(
+            sourcesProcessed = histories.size,
+            totalFound = histories.sumOf { it.itemsFound },
+            totalSaved = histories.sumOf { it.itemsSaved },
+            totalUpdated = histories.sumOf { it.itemsUpdated },
+            failedSources = histories.count { !it.isSuccessful() }
+        )
+
+        return ApiResponse.success(result, "Qiita 크롤링이 완료되었습니다.")
     }
 
     @Operation(summary = "최근 커뮤니티 글 조회", description = "최근 수집된 커뮤니티 글 목록을 조회합니다.")
