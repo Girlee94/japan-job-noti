@@ -3,64 +3,58 @@ package com.readyjapan.infrastructure.persistence.repository
 import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.Sentiment
-import com.readyjapan.core.domain.repository.CommunityPostRepository
-import org.springframework.data.domain.PageRequest
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
 
-@Repository
-interface JpaCommunityPostRepository : JpaRepository<CommunityPost, Long>, CommunityPostRepository {
+interface JpaCommunityPostRepository : JpaRepository<CommunityPost, Long> {
 
     @Query("SELECT c FROM CommunityPost c WHERE c.source.id = :sourceId AND c.externalId = :externalId")
-    override fun findBySourceIdAndExternalId(
+    fun findBySourceIdAndExternalId(
         @Param("sourceId") sourceId: Long,
         @Param("externalId") externalId: String
     ): CommunityPost?
 
-    override fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost>
+    fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost>
 
     @Query("SELECT c FROM CommunityPost c WHERE c.createdAt > :dateTime ORDER BY c.createdAt DESC")
-    override fun findAllByCreatedAtAfter(@Param("dateTime") dateTime: LocalDateTime): List<CommunityPost>
+    fun findAllByCreatedAtAfter(@Param("dateTime") dateTime: LocalDateTime): List<CommunityPost>
 
     @Query("SELECT c FROM CommunityPost c WHERE c.language = 'ja' AND c.contentTranslated IS NULL")
-    override fun findAllNeedingTranslation(): List<CommunityPost>
+    fun findAllNeedingTranslation(): List<CommunityPost>
 
     @Query("SELECT c FROM CommunityPost c WHERE c.sentiment IS NULL")
-    override fun findAllNeedingSentimentAnalysis(): List<CommunityPost>
+    fun findAllNeedingSentimentAnalysis(): List<CommunityPost>
 
-    override fun findBySentiment(sentiment: Sentiment): List<CommunityPost>
+    fun findBySentiment(sentiment: Sentiment): List<CommunityPost>
 
-    @Query("SELECT c FROM CommunityPost c WHERE c.likeCount >= :minLikes ORDER BY c.likeCount DESC")
-    fun findByLikeCountGreaterThanEqualOrderByLikeCountDesc(
+    @Query(
+        value = "SELECT * FROM community_posts WHERE like_count >= :minLikes ORDER BY like_count DESC LIMIT :limit",
+        nativeQuery = true
+    )
+    fun findPopularPosts(
         @Param("minLikes") minLikes: Int,
-        pageable: PageRequest
+        @Param("limit") limit: Int
     ): List<CommunityPost>
 
-    override fun findPopularPosts(minLikes: Int, limit: Int): List<CommunityPost> {
-        return findByLikeCountGreaterThanEqualOrderByLikeCountDesc(minLikes, PageRequest.of(0, limit))
-    }
-
-    @Query("SELECT c FROM CommunityPost c ORDER BY c.publishedAt DESC")
-    fun findAllOrderByPublishedAtDesc(pageable: PageRequest): List<CommunityPost>
-
-    override fun findRecentPosts(limit: Int): List<CommunityPost> {
-        return findAllOrderByPublishedAtDesc(PageRequest.of(0, limit))
-    }
+    @Query(
+        value = "SELECT * FROM community_posts ORDER BY published_at DESC NULLS LAST LIMIT :limit",
+        nativeQuery = true
+    )
+    fun findRecentPosts(@Param("limit") limit: Int): List<CommunityPost>
 
     @Query("SELECT COUNT(c) FROM CommunityPost c WHERE c.createdAt BETWEEN :start AND :end")
-    override fun countByCreatedAtBetween(
+    fun countByCreatedAtBetween(
         @Param("start") start: LocalDateTime,
         @Param("end") end: LocalDateTime
     ): Int
 
     @Query("SELECT COUNT(c) FROM CommunityPost c WHERE c.sentiment = :sentiment")
-    override fun countBySentiment(@Param("sentiment") sentiment: Sentiment): Int
+    fun countBySentiment(@Param("sentiment") sentiment: Sentiment): Int
 
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM CommunityPost c WHERE c.source.id = :sourceId AND c.externalId = :externalId")
-    override fun existsBySourceIdAndExternalId(
+    fun existsBySourceIdAndExternalId(
         @Param("sourceId") sourceId: Long,
         @Param("externalId") externalId: String
     ): Boolean
