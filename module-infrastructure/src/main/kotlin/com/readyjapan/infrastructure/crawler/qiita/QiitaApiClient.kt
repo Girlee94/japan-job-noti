@@ -32,6 +32,7 @@ class QiitaApiClient(
     private val apiClient: WebClient = webClientBuilder
         .baseUrl("https://qiita.com")
         .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+        .codecs { it.defaultCodecs().maxInMemorySize(2 * 1024 * 1024) }
         .clientConnector(
             ReactorClientHttpConnector(
                 HttpClient.create()

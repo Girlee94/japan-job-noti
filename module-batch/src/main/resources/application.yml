@@ -43,8 +43,9 @@ spring:
       on-profile: local
 
   datasource:
-    # 로컬 개발: Supabase Pooler (Session Mode) 연결
-    url: jdbc:postgresql://localhost:5432/postgres
+    # 로컬 개발: Supabase Pooler (Transaction Mode) 연결
+    # prepareThreshold=0: Supabase Pooler transaction mode에서 prepared statement 충돌 방지
+    url: jdbc:postgresql://localhost:6543/postgres?prepareThreshold=0&stringtype=unspecified
     username: postgres.your-tenant-id
     password: your-super-secret-and-long-postgres-password
 
