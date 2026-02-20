@@ -11,6 +11,7 @@ import java.time.LocalDateTime
 interface CommunityPostRepository {
     fun findById(id: Long): CommunityPost?
     fun findBySourceIdAndExternalId(sourceId: Long, externalId: String): CommunityPost?
+    fun findAllBySourceIdAndExternalIdIn(sourceId: Long, externalIds: List<String>): List<CommunityPost>
     fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost>
     fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<CommunityPost>
     fun findAllNeedingTranslation(): List<CommunityPost>

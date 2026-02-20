@@ -6,6 +6,7 @@ import com.readyjapan.core.domain.entity.CrawlSource
 import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.SourceType
 import com.readyjapan.core.domain.repository.CommunityPostRepository
+import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
@@ -20,11 +21,12 @@ import java.time.LocalDateTime
 class CrawlerControllerTest : BehaviorSpec({
 
     val redditCrawlerService = mockk<RedditCrawlerService>()
+    val qiitaCrawlerService = mockk<QiitaCrawlerService>()
     val communityPostRepository = mockk<CommunityPostRepository>()
-    val crawlerController = CrawlerController(redditCrawlerService, communityPostRepository)
+    val crawlerController = CrawlerController(redditCrawlerService, qiitaCrawlerService, communityPostRepository)
 
     beforeEach {
-        clearMocks(redditCrawlerService, communityPostRepository)
+        clearMocks(redditCrawlerService, qiitaCrawlerService, communityPostRepository)
     }
 
     fun createSource(): CrawlSource = CrawlSource(
@@ -56,7 +58,7 @@ class CrawlerControllerTest : BehaviorSpec({
                 history.complete(itemsFound = 10, itemsSaved = 8, itemsUpdated = 2)
                 every { redditCrawlerService.crawlAllSources() } returns listOf(history)
 
-                val response = crawlerController.runRedditCrawl()
+                val response = crawlerController.runRedditCrawl().call()
 
                 response.success shouldBe true
                 response.data!!.sourcesProcessed shouldBe 1
@@ -73,7 +75,7 @@ class CrawlerControllerTest : BehaviorSpec({
                     emptyList()
                 }
 
-                val thread = Thread { crawlerController.runRedditCrawl() }
+                val thread = Thread { crawlerController.runRedditCrawl().call() }
                 thread.start()
                 Thread.sleep(20)
 

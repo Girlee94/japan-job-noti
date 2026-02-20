@@ -18,6 +18,9 @@ class CommunityPostRepositoryAdapter(
     override fun findBySourceIdAndExternalId(sourceId: Long, externalId: String): CommunityPost? =
         jpa.findBySourceIdAndExternalId(sourceId, externalId)
 
+    override fun findAllBySourceIdAndExternalIdIn(sourceId: Long, externalIds: List<String>): List<CommunityPost> =
+        if (externalIds.isEmpty()) emptyList() else jpa.findAllBySourceIdAndExternalIdIn(sourceId, externalIds)
+
     override fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost> =
         jpa.findAllByPlatform(platform)
 

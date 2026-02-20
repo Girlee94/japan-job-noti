@@ -5,6 +5,7 @@ import com.readyjapan.core.domain.entity.CrawlSource
 import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.CrawlStatus
 import com.readyjapan.core.domain.entity.enums.SourceType
+import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
@@ -16,9 +17,10 @@ import io.mockk.verify
 class CrawlerSchedulerTest : BehaviorSpec({
 
     val redditCrawlerService = mockk<RedditCrawlerService>()
-    val crawlerScheduler = CrawlerScheduler(redditCrawlerService)
+    val qiitaCrawlerService = mockk<QiitaCrawlerService>()
+    val crawlerScheduler = CrawlerScheduler(redditCrawlerService, qiitaCrawlerService)
 
-    beforeEach { clearMocks(redditCrawlerService) }
+    beforeEach { clearMocks(redditCrawlerService, qiitaCrawlerService) }
 
     fun createSource(): CrawlSource = CrawlSource(
         id = 1L,
@@ -46,11 +48,12 @@ class CrawlerSchedulerTest : BehaviorSpec({
     Given("manualCrawl") {
         When("정상 집계 시") {
             Then("집계 결과를 반환한다") {
-                val histories = listOf(
+                val redditHistories = listOf(
                     createHistory(CrawlStatus.SUCCESS, itemsFound = 10, itemsSaved = 8, itemsUpdated = 2),
                     createHistory(CrawlStatus.SUCCESS, itemsFound = 5, itemsSaved = 3, itemsUpdated = 1)
                 )
-                every { redditCrawlerService.crawlAllSources() } returns histories
+                every { redditCrawlerService.crawlAllSources() } returns redditHistories
+                every { qiitaCrawlerService.crawlAllSources() } returns emptyList()
 
                 val result = crawlerScheduler.manualCrawl()
 
@@ -68,6 +71,7 @@ class CrawlerSchedulerTest : BehaviorSpec({
                     createHistory(CrawlStatus.FAILED)
                 )
                 every { redditCrawlerService.crawlAllSources() } returns histories
+                every { qiitaCrawlerService.crawlAllSources() } returns emptyList()
 
                 val result = crawlerScheduler.manualCrawl()
 

@@ -75,6 +75,17 @@ app:
     client-secret: ${REDDIT_CLIENT_SECRET:}
     user-agent: "ReadyJapan/1.0"
 
+  qiita:
+    enabled: true
+    access-token: ${QIITA_ACCESS_TOKEN:}
+    tags:
+      - "日本"
+      - "就職"
+      - "転職"
+      - "キャリア"
+    per-page: 20
+    request-delay-ms: 2000
+
   scheduler:
     daily-summary:
       enabled: true
