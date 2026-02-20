@@ -28,11 +28,13 @@ class RedditApiClient(
     webClientBuilder: WebClient.Builder
 ) {
     private val authClient: WebClient = webClientBuilder
+        .clone()
         .baseUrl("https://www.reddit.com")
         .defaultHeader(HttpHeaders.USER_AGENT, properties.userAgent)
         .build()
 
     private val apiClient: WebClient = webClientBuilder
+        .clone()
         .baseUrl("https://oauth.reddit.com")
         .defaultHeader(HttpHeaders.USER_AGENT, properties.userAgent)
         .build()

@@ -29,10 +29,15 @@ class QiitaApiClient(
     crawlerConfig: CrawlerConfig,
     webClientBuilder: WebClient.Builder
 ) {
+    companion object {
+        private const val MAX_IN_MEMORY_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB — Qiita 기사 본문 포함 응답 대응
+    }
+
     private val apiClient: WebClient = webClientBuilder
+        .clone()
         .baseUrl("https://qiita.com")
         .defaultHeader(HttpHeaders.ACCEPT, "application/json")
-        .codecs { it.defaultCodecs().maxInMemorySize(2 * 1024 * 1024) }
+        .codecs { it.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_SIZE_BYTES) }
         .clientConnector(
             ReactorClientHttpConnector(
                 HttpClient.create()
