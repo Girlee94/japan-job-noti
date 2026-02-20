@@ -39,15 +39,21 @@ ready-japan/
 6. Null 처리는 Elvis 연산자, Safe call 활용 (`!!` 금지)
 
 ## 핵심 기능
-1. **데이터 수집**: 일본 취업 관련 웹 크롤링 및 API 연동
-2. **데이터 요약**: LLM API 연동을 통한 요약 생성
-3. **알림 발송**: 텔레그램 봇을 통한 매일 오전 9시 알림
+1. **데이터 수집**: Reddit 크롤러 (`RedditApiClient` — OAuth2 client_credentials, 08:00/18:00 JST)
+2. **번역**: `TranslationService` — OpenAI로 일→한 번역 (30분 간격 배치)
+3. **감정 분석**: `SentimentAnalysisService` — 커뮤니티 게시글 감정 분류 (30분 간격 배치)
+4. **일간 요약**: `SummarizationService` — 전일 데이터 LLM 요약 생성 (09:00 JST)
+5. **알림 발송**: `TelegramClient` — 일간 요약 텔레그램 전송
 
-## 주요 Entity (예정)
-- `JobPosting`: 채용 공고
-- `NewsArticle`: 뉴스 기사
-- `CrawlHistory`: 크롤링 이력
-- `DailySummary`: 일간 요약
+## 주요 Entity
+- `CrawlSource`: 크롤링 소스 설정 (서브레딧, 뉴스 사이트 등)
+- `CommunityPost`: 커뮤니티 게시글 (Reddit 등, 감정분석/번역 포함)
+- `JobPosting`: 채용 공고 (이중 언어: 원문 + 번역)
+- `NewsArticle`: 뉴스 기사 (이중 언어: 원문 + 번역)
+- `CrawlHistory`: 크롤링 실행 이력
+- `DailySummary`: LLM 생성 일간 요약 (텔레그램 발송 상태 포함)
+
+모든 엔티티는 `BaseEntity`(createdAt, updatedAt — JPA Auditing)를 상속.
 
 ## 환경 변수
 ```
@@ -60,9 +66,15 @@ DB_PASSWORD=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 
-# LLM (Optional)
+# LLM
 OPENAI_API_KEY=
+
+# Reddit OAuth2
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
 ```
+
+local 프로필에서는 `app.telegram.enabled=false`, `app.llm.enabled=false`로 외부 서비스 비활성화.
 
 ## 개발 명령어
 ```bash
