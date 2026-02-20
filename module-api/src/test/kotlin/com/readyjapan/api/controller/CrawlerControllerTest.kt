@@ -58,7 +58,7 @@ class CrawlerControllerTest : BehaviorSpec({
                 history.complete(itemsFound = 10, itemsSaved = 8, itemsUpdated = 2)
                 every { redditCrawlerService.crawlAllSources() } returns listOf(history)
 
-                val response = crawlerController.runRedditCrawl()
+                val response = crawlerController.runRedditCrawl().call()
 
                 response.success shouldBe true
                 response.data!!.sourcesProcessed shouldBe 1
@@ -75,7 +75,7 @@ class CrawlerControllerTest : BehaviorSpec({
                     emptyList()
                 }
 
-                val thread = Thread { crawlerController.runRedditCrawl() }
+                val thread = Thread { crawlerController.runRedditCrawl().call() }
                 thread.start()
                 Thread.sleep(20)
 
