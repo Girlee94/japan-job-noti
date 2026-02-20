@@ -33,5 +33,13 @@ data class ApiResponse<T>(
                 data = null
             )
         }
+
+        fun <T> error(message: String): ApiResponse<T> {
+            return ApiResponse(
+                success = false,
+                data = null,
+                message = message
+            )
+        }
     }
 }

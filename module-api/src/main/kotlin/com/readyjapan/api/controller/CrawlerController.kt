@@ -5,6 +5,7 @@ import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.repository.CommunityPostRepository
 import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicBoolean
+
+private val logger = KotlinLogging.logger {}
 
 @Tag(name = "Crawler", description = "크롤링 관리 API")
 @RestController
@@ -32,21 +35,22 @@ class CrawlerController(
         }
 
         return Callable {
-            val histories = try {
-                redditCrawlerService.crawlAllSources()
+            try {
+                val histories = redditCrawlerService.crawlAllSources()
+                val result = CrawlResultResponse(
+                    sourcesProcessed = histories.size,
+                    totalFound = histories.sumOf { it.itemsFound },
+                    totalSaved = histories.sumOf { it.itemsSaved },
+                    totalUpdated = histories.sumOf { it.itemsUpdated },
+                    failedSources = histories.count { !it.isSuccessful() }
+                )
+                ApiResponse.success(result, "크롤링이 완료되었습니다.")
+            } catch (e: Exception) {
+                logger.error(e) { "Reddit 크롤링 중 오류 발생" }
+                ApiResponse.error("크롤링 중 오류가 발생했습니다: ${e.message}")
             } finally {
                 crawlInProgress.set(false)
             }
-
-            val result = CrawlResultResponse(
-                sourcesProcessed = histories.size,
-                totalFound = histories.sumOf { it.itemsFound },
-                totalSaved = histories.sumOf { it.itemsSaved },
-                totalUpdated = histories.sumOf { it.itemsUpdated },
-                failedSources = histories.count { !it.isSuccessful() }
-            )
-
-            ApiResponse.success(result, "크롤링이 완료되었습니다.")
         }
     }
 
@@ -58,21 +62,22 @@ class CrawlerController(
         }
 
         return Callable {
-            val histories = try {
-                qiitaCrawlerService.crawlAllSources()
+            try {
+                val histories = qiitaCrawlerService.crawlAllSources()
+                val result = CrawlResultResponse(
+                    sourcesProcessed = histories.size,
+                    totalFound = histories.sumOf { it.itemsFound },
+                    totalSaved = histories.sumOf { it.itemsSaved },
+                    totalUpdated = histories.sumOf { it.itemsUpdated },
+                    failedSources = histories.count { !it.isSuccessful() }
+                )
+                ApiResponse.success(result, "Qiita 크롤링이 완료되었습니다.")
+            } catch (e: Exception) {
+                logger.error(e) { "Qiita 크롤링 중 오류 발생" }
+                ApiResponse.error("Qiita 크롤링 중 오류가 발생했습니다: ${e.message}")
             } finally {
                 qiitaCrawlInProgress.set(false)
             }
-
-            val result = CrawlResultResponse(
-                sourcesProcessed = histories.size,
-                totalFound = histories.sumOf { it.itemsFound },
-                totalSaved = histories.sumOf { it.itemsSaved },
-                totalUpdated = histories.sumOf { it.itemsUpdated },
-                failedSources = histories.count { !it.isSuccessful() }
-            )
-
-            ApiResponse.success(result, "Qiita 크롤링이 완료되었습니다.")
         }
     }
 
