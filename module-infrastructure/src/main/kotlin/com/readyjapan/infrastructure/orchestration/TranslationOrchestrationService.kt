@@ -37,9 +37,15 @@ class TranslationOrchestrationService(
     fun translatePendingContent(batchSize: Int = DEFAULT_BATCH_SIZE): TranslationBatchResult {
         logger.info { "Starting translation batch (batchSize=$batchSize)" }
 
-        val jobsTranslated = translateJobPostings(batchSize)
-        val newsTranslated = translateNewsArticles(batchSize)
-        val postsTranslated = translateCommunityPosts(batchSize)
+        val jobsTranslated = runCatching { translateJobPostings(batchSize) }
+            .onFailure { logger.error(it) { "Job posting translation batch failed" } }
+            .getOrDefault(0)
+        val newsTranslated = runCatching { translateNewsArticles(batchSize) }
+            .onFailure { logger.error(it) { "News article translation batch failed" } }
+            .getOrDefault(0)
+        val postsTranslated = runCatching { translateCommunityPosts(batchSize) }
+            .onFailure { logger.error(it) { "Community post translation batch failed" } }
+            .getOrDefault(0)
 
         logger.info {
             "Translation batch completed - Jobs: $jobsTranslated, " +

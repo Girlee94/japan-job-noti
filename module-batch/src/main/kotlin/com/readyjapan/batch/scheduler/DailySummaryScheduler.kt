@@ -5,6 +5,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.LocalDate
+import java.time.ZoneId
 
 private val logger = KotlinLogging.logger {}
 
@@ -22,7 +23,7 @@ class DailySummaryScheduler(
      */
     @Scheduled(cron = "\${app.scheduler.daily-summary.cron:0 0 9 * * *}")
     fun generateAndSendDailySummary() {
-        val yesterday = LocalDate.now().minusDays(1)
+        val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
         logger.info { "Starting daily summary generation for: $yesterday" }
 
         val result = dailySummaryOrchestrationService.generateAndSendDailySummary(

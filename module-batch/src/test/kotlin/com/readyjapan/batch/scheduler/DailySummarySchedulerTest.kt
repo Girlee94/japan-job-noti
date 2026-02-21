@@ -12,6 +12,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import java.time.LocalDate
+import java.time.ZoneId
 
 class DailySummarySchedulerTest : BehaviorSpec({
 
@@ -25,7 +26,7 @@ class DailySummarySchedulerTest : BehaviorSpec({
     Given("generateAndSendDailySummary") {
         When("스케줄러 실행 시") {
             Then("OrchestrationService에 skipIfExists=true로 위임한다") {
-                val yesterday = LocalDate.now().minusDays(1)
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
                 every {
                     dailySummaryOrchestrationService.generateAndSendDailySummary(
                         targetDate = yesterday,
@@ -61,7 +62,7 @@ class DailySummarySchedulerTest : BehaviorSpec({
 
         When("이미 요약이 존재하는 경우") {
             Then("스킵 결과를 로그에 남긴다") {
-                val yesterday = LocalDate.now().minusDays(1)
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
                 every {
                     dailySummaryOrchestrationService.generateAndSendDailySummary(
                         targetDate = yesterday,
@@ -82,7 +83,7 @@ class DailySummarySchedulerTest : BehaviorSpec({
 
         When("요약 생성 실패 시") {
             Then("실패 결과를 로그에 남기며 예외가 전파되지 않는다") {
-                val yesterday = LocalDate.now().minusDays(1)
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
                 val failureResult = DailySummaryGenerationResult.failure("DB error")
                 every {
                     dailySummaryOrchestrationService.generateAndSendDailySummary(

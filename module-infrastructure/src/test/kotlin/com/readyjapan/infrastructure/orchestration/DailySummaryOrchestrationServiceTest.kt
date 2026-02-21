@@ -125,7 +125,15 @@ class DailySummaryOrchestrationServiceTest : BehaviorSpec({
     Given("generateAndSendDailySummary") {
 
         When("텔레그램 전송 성공 시") {
-            Then("markSummaryAsSent를 호출한다") {
+            Then("markSummaryAsSent를 호출하고 SENT 상태 엔티티를 반환한다") {
+                val sentSummary = DailySummary(
+                    summaryDate = targetDate,
+                    summaryContent = "테스트 요약",
+                    jobPostingCount = 2,
+                    newsArticleCount = 3,
+                    communityPostCount = 5,
+                    status = SummaryStatus.SENT
+                )
                 every { persistenceService.existsBySummaryDateAndSent(targetDate) } returns false
                 every { persistenceService.findJobPostingsBetween(startOfDay, endOfDay) } returns emptyList()
                 every { persistenceService.findNewsArticlesBetween(startOfDay, endOfDay) } returns emptyList()
@@ -133,12 +141,13 @@ class DailySummaryOrchestrationServiceTest : BehaviorSpec({
                 every { summarizationService.generateDailySummary(targetDate, any(), any(), any()) } returns summaryResult
                 every { persistenceService.saveSummary(targetDate, summaryResult) } returns savedSummary
                 every { telegramClient.sendMessageSync(any()) } returns true
-                every { persistenceService.markSummaryAsSent(any()) } just Runs
+                every { persistenceService.markSummaryAsSent(any()) } returns sentSummary
 
                 val result = service.generateAndSendDailySummary(targetDate, skipIfExists = false)
 
                 result.telegramSent shouldBe true
                 result.failed shouldBe false
+                result.dailySummary shouldBe sentSummary
                 verify(exactly = 1) { persistenceService.markSummaryAsSent(savedSummary.id) }
             }
         }

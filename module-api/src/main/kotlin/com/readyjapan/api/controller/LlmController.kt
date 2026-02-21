@@ -34,8 +34,13 @@ class LlmController(
     fun triggerTranslation(): Callable<ApiResponse<TranslationResultDto>> {
         logger.info { "Manual translation triggered" }
         return Callable {
-            val result = translationOrchestrationService.translatePendingContent()
-            ApiResponse.success(TranslationResultDto.from(result))
+            try {
+                val result = translationOrchestrationService.translatePendingContent()
+                ApiResponse.success(TranslationResultDto.from(result))
+            } catch (e: Exception) {
+                logger.warn(e) { "Translation failed" }
+                ApiResponse.error("번역 처리 중 오류가 발생했습니다")
+            }
         }
     }
 
@@ -46,8 +51,13 @@ class LlmController(
     fun triggerSentimentAnalysis(): Callable<ApiResponse<SentimentAnalysisResultDto>> {
         logger.info { "Manual sentiment analysis triggered" }
         return Callable {
-            val result = sentimentOrchestrationService.analyzePendingSentiments()
-            ApiResponse.success(SentimentAnalysisResultDto.from(result))
+            try {
+                val result = sentimentOrchestrationService.analyzePendingSentiments()
+                ApiResponse.success(SentimentAnalysisResultDto.from(result))
+            } catch (e: Exception) {
+                logger.warn(e) { "Sentiment analysis failed" }
+                ApiResponse.error("감정 분석 처리 중 오류가 발생했습니다")
+            }
         }
     }
 
@@ -63,8 +73,13 @@ class LlmController(
         val targetDate = date ?: LocalDate.now().minusDays(1)
         logger.info { "Manual summary generation for: $targetDate" }
         return Callable {
-            val result = dailySummaryOrchestrationService.generateDailySummary(targetDate, skipIfExists = false)
-            ApiResponse.success(DailySummaryResultDto.from(result))
+            try {
+                val result = dailySummaryOrchestrationService.generateDailySummary(targetDate, skipIfExists = false)
+                ApiResponse.success(DailySummaryResultDto.from(result))
+            } catch (e: Exception) {
+                logger.warn(e) { "Daily summary generation failed for: $targetDate" }
+                ApiResponse.error("일일 요약 생성 중 오류가 발생했습니다")
+            }
         }
     }
 
@@ -80,8 +95,13 @@ class LlmController(
         val targetDate = date ?: LocalDate.now().minusDays(1)
         logger.info { "Manual summary generation and send for: $targetDate" }
         return Callable {
-            val result = dailySummaryOrchestrationService.generateAndSendDailySummary(targetDate, skipIfExists = false)
-            ApiResponse.success(DailySummaryResultDto.from(result))
+            try {
+                val result = dailySummaryOrchestrationService.generateAndSendDailySummary(targetDate, skipIfExists = false)
+                ApiResponse.success(DailySummaryResultDto.from(result))
+            } catch (e: Exception) {
+                logger.warn(e) { "Daily summary generation and send failed for: $targetDate" }
+                ApiResponse.error("일일 요약 생성 및 전송 중 오류가 발생했습니다")
+            }
         }
     }
 }

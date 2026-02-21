@@ -104,15 +104,21 @@ class DailySummaryOrchestrationService(
             val sent = telegramClient.sendMessageSync(telegramMessage)
 
             // 5. DB 업데이트 (@Transactional): 발송 상태 변경 (ID 기반 재조회)
-            if (sent) {
-                persistenceService.markSummaryAsSent(savedSummary.id)
-                logger.info { "Daily summary sent to Telegram successfully" }
+            val resultSummary = if (sent) {
+                val updatedSummary = persistenceService.markSummaryAsSent(savedSummary.id)
+                if (updatedSummary != null) {
+                    logger.info { "Daily summary sent to Telegram successfully" }
+                } else {
+                    logger.warn { "Telegram sent but failed to mark summary as SENT: id=${savedSummary.id}" }
+                }
+                updatedSummary ?: savedSummary
             } else {
                 logger.warn { "Failed to send daily summary to Telegram" }
+                savedSummary
             }
 
             DailySummaryGenerationResult(
-                dailySummary = savedSummary,
+                dailySummary = resultSummary,
                 telegramSent = sent,
                 skipped = false,
                 skippedReason = null,
