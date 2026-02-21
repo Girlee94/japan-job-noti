@@ -29,9 +29,15 @@ class QiitaApiClient(
     crawlerConfig: CrawlerConfig,
     webClientBuilder: WebClient.Builder
 ) {
+    companion object {
+        private const val MAX_IN_MEMORY_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB — Qiita 기사 본문 포함 응답 대응
+    }
+
     private val apiClient: WebClient = webClientBuilder
+        .clone()
         .baseUrl("https://qiita.com")
         .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+        .codecs { it.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_SIZE_BYTES) }
         .clientConnector(
             ReactorClientHttpConnector(
                 HttpClient.create()
@@ -39,12 +45,21 @@ class QiitaApiClient(
                     .responseTimeout(Duration.ofSeconds(crawlerConfig.timeoutSeconds))
             )
         )
-        .apply {
+        .also { builder ->
             if (properties.accessToken.isNotBlank()) {
-                it.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${properties.accessToken}")
+                builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${properties.accessToken}")
             }
         }
         .build()
+
+    init {
+        if (properties.enabled && properties.accessToken.isBlank()) {
+            logger.warn {
+                "Qiita API is enabled without access token. " +
+                    "Rate limit will be 60 requests/hour. Set QIITA_ACCESS_TOKEN for 1000 requests/hour."
+            }
+        }
+    }
 
     /**
      * 태그로 기사 검색

@@ -17,6 +17,9 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+      data-source-properties:
+        prepareThreshold: 0
+        stringtype: unspecified
 
   jpa:
     hibernate:
@@ -50,6 +53,18 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: alpha
 
+app:
+  qiita:
+    enabled: ${QIITA_ENABLED:true}
+    access-token: ${QIITA_ACCESS_TOKEN:}
+    tags:
+      - "日本"
+      - "就職"
+      - "転職"
+      - "キャリア"
+    per-page: 20
+    request-delay-ms: 2000
+
 logging:
   level:
     root: INFO
@@ -62,10 +77,9 @@ spring:
       on-profile: local
 
   datasource:
-    # 로컬 개발: Supabase Pooler (Session Mode) 연결
-    url: jdbc:postgresql://localhost:5432/postgres
-    username: postgres.your-tenant-id
-    password: your-super-secret-and-long-postgres-password
+    # 로컬 개발: Supabase Pooler (Transaction Mode) 연결
+    username: ${DB_USERNAME:postgres.your-tenant-id}
+    password: ${DB_PASSWORD:your-super-secret-and-long-postgres-password}
 
   jpa:
     hibernate:
@@ -95,3 +109,7 @@ logging:
   level:
     root: WARN
     com.readyjapan: INFO
+
+app:
+  qiita:
+    access-token: ${QIITA_ACCESS_TOKEN}

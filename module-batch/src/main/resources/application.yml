@@ -17,6 +17,9 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+      data-source-properties:
+        prepareThreshold: 0
+        stringtype: unspecified
 
   jpa:
     hibernate:
@@ -28,6 +31,18 @@ spring:
         default_schema: public
     show-sql: false
     open-in-view: false
+
+app:
+  qiita:
+    enabled: ${QIITA_ENABLED:true}
+    access-token: ${QIITA_ACCESS_TOKEN:}
+    tags:
+      - "日本"
+      - "就職"
+      - "転職"
+      - "キャリア"
+    per-page: 20
+    request-delay-ms: 2000
 
 logging:
   level:
@@ -43,10 +58,9 @@ spring:
       on-profile: local
 
   datasource:
-    # 로컬 개발: Supabase Pooler (Session Mode) 연결
-    url: jdbc:postgresql://localhost:5432/postgres
-    username: postgres.your-tenant-id
-    password: your-super-secret-and-long-postgres-password
+    # 로컬 개발: Supabase Pooler (Transaction Mode) 연결
+    username: ${DB_USERNAME:postgres.your-tenant-id}
+    password: ${DB_PASSWORD:your-super-secret-and-long-postgres-password}
 
   jpa:
     hibernate:
@@ -74,17 +88,6 @@ app:
     client-id: ${REDDIT_CLIENT_ID:}
     client-secret: ${REDDIT_CLIENT_SECRET:}
     user-agent: "ReadyJapan/1.0"
-
-  qiita:
-    enabled: true
-    access-token: ${QIITA_ACCESS_TOKEN:}
-    tags:
-      - "日本"
-      - "就職"
-      - "転職"
-      - "キャリア"
-    per-page: 20
-    request-delay-ms: 2000
 
   scheduler:
     daily-summary:
@@ -129,3 +132,6 @@ app:
     client-id: ${REDDIT_CLIENT_ID}
     client-secret: ${REDDIT_CLIENT_SECRET}
     user-agent: "ReadyJapan/1.0"
+
+  qiita:
+    access-token: ${QIITA_ACCESS_TOKEN}
