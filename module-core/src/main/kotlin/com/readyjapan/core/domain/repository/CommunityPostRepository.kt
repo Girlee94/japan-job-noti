@@ -14,6 +14,8 @@ interface CommunityPostRepository {
     fun findAllBySourceIdAndExternalIdIn(sourceId: Long, externalIds: List<String>): List<CommunityPost>
     fun findAllByPlatform(platform: CommunityPlatform): List<CommunityPost>
     fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<CommunityPost>
+
+    fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<CommunityPost>
     fun findAllNeedingTranslation(): List<CommunityPost>
     fun findAllNeedingSentimentAnalysis(): List<CommunityPost>
     fun findBySentiment(sentiment: Sentiment): List<CommunityPost>

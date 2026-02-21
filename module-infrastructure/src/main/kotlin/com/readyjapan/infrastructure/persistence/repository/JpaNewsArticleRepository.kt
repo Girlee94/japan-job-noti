@@ -17,6 +17,12 @@ interface JpaNewsArticleRepository : JpaRepository<NewsArticle, Long> {
     @Query("SELECT n FROM NewsArticle n WHERE n.createdAt > :dateTime ORDER BY n.createdAt DESC")
     fun findAllByCreatedAtAfter(@Param("dateTime") dateTime: LocalDateTime): List<NewsArticle>
 
+    @Query("SELECT n FROM NewsArticle n WHERE n.createdAt BETWEEN :start AND :end ORDER BY n.createdAt DESC")
+    fun findAllByCreatedAtBetween(
+        @Param("start") start: LocalDateTime,
+        @Param("end") end: LocalDateTime
+    ): List<NewsArticle>
+
     @Query("SELECT n FROM NewsArticle n WHERE n.language = 'ja' AND n.titleTranslated IS NULL")
     fun findAllNeedingTranslation(): List<NewsArticle>
 

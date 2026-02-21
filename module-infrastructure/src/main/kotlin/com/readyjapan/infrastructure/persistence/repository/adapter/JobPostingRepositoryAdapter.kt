@@ -23,6 +23,9 @@ class JobPostingRepositoryAdapter(
     override fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<JobPosting> =
         jpa.findAllByCreatedAtAfter(dateTime)
 
+    override fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<JobPosting> =
+        jpa.findAllByCreatedAtBetween(start, end)
+
     override fun findAllNeedingTranslation(): List<JobPosting> =
         jpa.findAllNeedingTranslation()
 

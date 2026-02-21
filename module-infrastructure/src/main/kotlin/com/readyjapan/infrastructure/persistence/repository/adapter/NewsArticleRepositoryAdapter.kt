@@ -19,6 +19,9 @@ class NewsArticleRepositoryAdapter(
     override fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<NewsArticle> =
         jpa.findAllByCreatedAtAfter(dateTime)
 
+    override fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<NewsArticle> =
+        jpa.findAllByCreatedAtBetween(start, end)
+
     override fun findAllNeedingTranslation(): List<NewsArticle> =
         jpa.findAllNeedingTranslation()
 

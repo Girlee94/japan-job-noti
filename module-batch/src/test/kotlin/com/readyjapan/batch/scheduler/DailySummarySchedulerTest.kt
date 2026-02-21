@@ -2,143 +2,108 @@ package com.readyjapan.batch.scheduler
 
 import com.readyjapan.core.domain.entity.DailySummary
 import com.readyjapan.core.domain.entity.enums.SummaryStatus
-import com.readyjapan.core.domain.repository.CommunityPostRepository
-import com.readyjapan.core.domain.repository.DailySummaryRepository
-import com.readyjapan.core.domain.repository.JobPostingRepository
-import com.readyjapan.core.domain.repository.NewsArticleRepository
-import com.readyjapan.infrastructure.external.llm.service.DailySummaryResult
-import com.readyjapan.infrastructure.external.llm.service.SummarizationService
 import com.readyjapan.infrastructure.external.llm.service.SummaryStats
-import com.readyjapan.infrastructure.external.telegram.TelegramClient
+import com.readyjapan.infrastructure.orchestration.DailySummaryOrchestrationService
+import com.readyjapan.infrastructure.orchestration.result.DailySummaryGenerationResult
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import java.time.LocalDate
+import java.time.ZoneId
 
 class DailySummarySchedulerTest : BehaviorSpec({
 
-    val jobPostingRepository = mockk<JobPostingRepository>()
-    val newsArticleRepository = mockk<NewsArticleRepository>()
-    val communityPostRepository = mockk<CommunityPostRepository>()
-    val dailySummaryRepository = mockk<DailySummaryRepository>()
-    val summarizationService = mockk<SummarizationService>()
-    val telegramClient = mockk<TelegramClient>()
-    val dailySummaryScheduler = DailySummaryScheduler(
-        jobPostingRepository, newsArticleRepository, communityPostRepository,
-        dailySummaryRepository, summarizationService, telegramClient
-    )
+    val dailySummaryOrchestrationService = mockk<DailySummaryOrchestrationService>()
+    val dailySummaryScheduler = DailySummaryScheduler(dailySummaryOrchestrationService)
 
     beforeEach {
-        clearMocks(
-            jobPostingRepository, newsArticleRepository, communityPostRepository,
-            dailySummaryRepository, summarizationService, telegramClient
-        )
+        clearMocks(dailySummaryOrchestrationService)
     }
 
     Given("generateAndSendDailySummary") {
-        When("이미 요약 존재 시") {
-            Then("스킵한다") {
-                val yesterday = LocalDate.now().minusDays(1)
-                every { dailySummaryRepository.existsBySummaryDate(yesterday) } returns true
-
-                dailySummaryScheduler.generateAndSendDailySummary()
-
-                verify(exactly = 0) { summarizationService.generateDailySummary(any(), any(), any(), any()) }
-            }
-        }
-        When("정상 생성 및 전송 시") {
-            Then("요약 생성과 텔레그램 전송이 수행된다") {
-                val yesterday = LocalDate.now().minusDays(1)
-                every { dailySummaryRepository.existsBySummaryDate(yesterday) } returns false
-                every { jobPostingRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { newsArticleRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { communityPostRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
+        When("스케줄러 실행 시") {
+            Then("OrchestrationService에 skipIfExists=true로 위임한다") {
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
                 every {
-                    summarizationService.generateDailySummary(any(), any(), any(), any())
-                } returns DailySummaryResult(
-                    summary = "오늘의 요약입니다.",
-                    success = true,
-                    stats = SummaryStats(jobPostingCount = 0, newsArticleCount = 0, communityPostCount = 0)
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                } returns DailySummaryGenerationResult(
+                    dailySummary = DailySummary(
+                        summaryDate = yesterday,
+                        summaryContent = "테스트 요약",
+                        jobPostingCount = 1,
+                        newsArticleCount = 2,
+                        communityPostCount = 3,
+                        status = SummaryStatus.SENT
+                    ),
+                    telegramSent = true,
+                    skipped = false,
+                    skippedReason = null,
+                    failed = false,
+                    errorMessage = null,
+                    stats = SummaryStats(1, 2, 3)
                 )
-                val summarySlot = slot<DailySummary>()
-                every { dailySummaryRepository.save(capture(summarySlot)) } answers { summarySlot.captured }
-                every { telegramClient.sendMessageSync(any()) } returns true
 
                 dailySummaryScheduler.generateAndSendDailySummary()
 
-                verify(exactly = 1) { summarizationService.generateDailySummary(any(), any(), any(), any()) }
-                verify(exactly = 1) { telegramClient.sendMessageSync(any()) }
-                verify(atLeast = 2) { dailySummaryRepository.save(any()) }
+                verify(exactly = 1) {
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                }
             }
         }
-        When("텔레그램 실패 시") {
-            Then("markAsSent가 호출되지 않는다") {
-                val yesterday = LocalDate.now().minusDays(1)
-                every { dailySummaryRepository.existsBySummaryDate(yesterday) } returns false
-                every { jobPostingRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { newsArticleRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { communityPostRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
+
+        When("이미 요약이 존재하는 경우") {
+            Then("스킵 결과를 로그에 남긴다") {
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
                 every {
-                    summarizationService.generateDailySummary(any(), any(), any(), any())
-                } returns DailySummaryResult(
-                    summary = "요약 내용",
-                    success = true,
-                    stats = SummaryStats(0, 0, 0)
-                )
-                val summarySlot = slot<DailySummary>()
-                every { dailySummaryRepository.save(capture(summarySlot)) } answers { summarySlot.captured }
-                every { telegramClient.sendMessageSync(any()) } returns false
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                } returns DailySummaryGenerationResult.alreadyExists(yesterday)
 
                 dailySummaryScheduler.generateAndSendDailySummary()
 
-                verify(exactly = 1) { telegramClient.sendMessageSync(any()) }
-                verify(exactly = 1) { dailySummaryRepository.save(any()) }
+                verify(exactly = 1) {
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                }
             }
         }
-        When("예외 발생 시") {
-            Then("FAILED 요약을 저장한다") {
-                val yesterday = LocalDate.now().minusDays(1)
-                every { dailySummaryRepository.existsBySummaryDate(yesterday) } returns false
-                every { jobPostingRepository.findAllByCreatedAtAfter(any()) } throws RuntimeException("DB error")
-                val summarySlot = slot<DailySummary>()
-                every { dailySummaryRepository.save(capture(summarySlot)) } answers { summarySlot.captured }
 
-                dailySummaryScheduler.generateAndSendDailySummary()
-
-                verify(exactly = 1) { dailySummaryRepository.save(any()) }
-                summarySlot.captured.status shouldBe SummaryStatus.FAILED
-                summarySlot.captured.summaryContent shouldContain "요약 생성 실패"
-            }
-        }
-    }
-
-    Given("generateSummaryForDate") {
-        When("지정 날짜로 요약 생성 시") {
-            Then("해당 날짜의 요약을 저장한다") {
-                val date = LocalDate.of(2026, 1, 15)
-                every { jobPostingRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { newsArticleRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
-                every { communityPostRepository.findAllByCreatedAtAfter(any()) } returns emptyList()
+        When("요약 생성 실패 시") {
+            Then("실패 결과를 로그에 남기며 예외가 전파되지 않는다") {
+                val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
+                val failureResult = DailySummaryGenerationResult.failure("DB error")
                 every {
-                    summarizationService.generateDailySummary(any(), any(), any(), any())
-                } returns DailySummaryResult(
-                    summary = "1월 15일 요약",
-                    success = true,
-                    stats = SummaryStats(0, 0, 0)
-                )
-                val summarySlot = slot<DailySummary>()
-                every { dailySummaryRepository.save(capture(summarySlot)) } answers { summarySlot.captured }
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                } returns failureResult
 
-                val result = dailySummaryScheduler.generateSummaryForDate(date)
+                // 실패 결과여도 스케줄러가 예외 없이 정상 실행됨을 검증
+                dailySummaryScheduler.generateAndSendDailySummary()
 
-                result.summaryDate shouldBe date
-                result.summaryContent shouldBe "1월 15일 요약"
-                result.status shouldBe SummaryStatus.SENT
+                verify(exactly = 1) {
+                    dailySummaryOrchestrationService.generateAndSendDailySummary(
+                        targetDate = yesterday,
+                        skipIfExists = true
+                    )
+                }
+                // 결과 상태 검증
+                failureResult.failed shouldBe true
+                failureResult.telegramSent shouldBe false
             }
         }
     }

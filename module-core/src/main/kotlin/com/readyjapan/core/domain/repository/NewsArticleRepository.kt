@@ -10,6 +10,8 @@ interface NewsArticleRepository {
     fun findById(id: Long): NewsArticle?
     fun findBySourceIdAndExternalId(sourceId: Long, externalId: String): NewsArticle?
     fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<NewsArticle>
+
+    fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<NewsArticle>
     fun findAllNeedingTranslation(): List<NewsArticle>
     fun findRecentArticles(limit: Int): List<NewsArticle>
     fun findByCategory(category: String): List<NewsArticle>
