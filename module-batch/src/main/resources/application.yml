@@ -17,6 +17,9 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+      data-source-properties:
+        prepareThreshold: 0
+        stringtype: unspecified
 
   jpa:
     hibernate:
@@ -28,6 +31,18 @@ spring:
         default_schema: public
     show-sql: false
     open-in-view: false
+
+app:
+  qiita:
+    enabled: true
+    access-token: ${QIITA_ACCESS_TOKEN:}
+    tags:
+      - "日本"
+      - "就職"
+      - "転職"
+      - "キャリア"
+    per-page: 20
+    request-delay-ms: 2000
 
 logging:
   level:
@@ -44,8 +59,7 @@ spring:
 
   datasource:
     # 로컬 개발: Supabase Pooler (Transaction Mode) 연결
-    # prepareThreshold=0: Supabase Pooler transaction mode에서 prepared statement 충돌 방지
-    url: jdbc:postgresql://localhost:6543/postgres?prepareThreshold=0&stringtype=unspecified
+    url: jdbc:postgresql://localhost:6543/postgres
     username: ${DB_USERNAME:postgres.your-tenant-id}
     password: ${DB_PASSWORD:your-super-secret-and-long-postgres-password}
 
@@ -75,17 +89,6 @@ app:
     client-id: ${REDDIT_CLIENT_ID:}
     client-secret: ${REDDIT_CLIENT_SECRET:}
     user-agent: "ReadyJapan/1.0"
-
-  qiita:
-    enabled: true
-    access-token: ${QIITA_ACCESS_TOKEN:}
-    tags:
-      - "日本"
-      - "就職"
-      - "転職"
-      - "キャリア"
-    per-page: 20
-    request-delay-ms: 2000
 
   scheduler:
     daily-summary:
@@ -132,5 +135,4 @@ app:
     user-agent: "ReadyJapan/1.0"
 
   qiita:
-    enabled: true
     access-token: ${QIITA_ACCESS_TOKEN}

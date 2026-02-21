@@ -45,9 +45,9 @@ class QiitaApiClient(
                     .responseTimeout(Duration.ofSeconds(crawlerConfig.timeoutSeconds))
             )
         )
-        .apply {
+        .also { builder ->
             if (properties.accessToken.isNotBlank()) {
-                it.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${properties.accessToken}")
+                builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${properties.accessToken}")
             }
         }
         .build()

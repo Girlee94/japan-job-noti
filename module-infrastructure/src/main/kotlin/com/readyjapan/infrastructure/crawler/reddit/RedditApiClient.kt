@@ -40,7 +40,9 @@ class RedditApiClient(
         .build()
 
     // 토큰 캐시
+    @Volatile
     private var cachedToken: String? = null
+    @Volatile
     private var tokenExpiresAt: Instant? = null
 
     /**
@@ -50,9 +52,11 @@ class RedditApiClient(
     private fun getAccessToken(): Mono<String> {
         // 캐시된 토큰이 유효하면 재사용
         val now = Instant.now()
-        if (cachedToken != null && tokenExpiresAt != null && now.isBefore(tokenExpiresAt)) {
+        val token = cachedToken
+        val expiresAt = tokenExpiresAt
+        if (token != null && expiresAt != null && now.isBefore(expiresAt)) {
             logger.debug { "Using cached Reddit access token" }
-            return Mono.just(cachedToken!!)
+            return Mono.just(token)
         }
 
         if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
