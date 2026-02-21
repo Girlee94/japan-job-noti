@@ -13,6 +13,8 @@ interface JobPostingRepository {
     fun findBySourceIdAndExternalId(sourceId: Long, externalId: String): JobPosting?
     fun findAllByStatus(status: PostingStatus): List<JobPosting>
     fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<JobPosting>
+
+    fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<JobPosting>
     fun findAllNeedingTranslation(): List<JobPosting>
     fun findRecentByStatus(status: PostingStatus, limit: Int): List<JobPosting>
     fun countByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): Int

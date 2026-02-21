@@ -27,6 +27,9 @@ class CommunityPostRepositoryAdapter(
     override fun findAllByCreatedAtAfter(dateTime: LocalDateTime): List<CommunityPost> =
         jpa.findAllByCreatedAtAfter(dateTime)
 
+    override fun findAllByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): List<CommunityPost> =
+        jpa.findAllByCreatedAtBetween(start, end)
+
     override fun findAllNeedingTranslation(): List<CommunityPost> =
         jpa.findAllNeedingTranslation()
 

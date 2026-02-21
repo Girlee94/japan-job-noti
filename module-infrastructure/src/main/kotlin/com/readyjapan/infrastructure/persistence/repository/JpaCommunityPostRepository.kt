@@ -27,6 +27,12 @@ interface JpaCommunityPostRepository : JpaRepository<CommunityPost, Long> {
     @Query("SELECT c FROM CommunityPost c WHERE c.createdAt > :dateTime ORDER BY c.createdAt DESC")
     fun findAllByCreatedAtAfter(@Param("dateTime") dateTime: LocalDateTime): List<CommunityPost>
 
+    @Query("SELECT c FROM CommunityPost c WHERE c.createdAt BETWEEN :start AND :end ORDER BY c.createdAt DESC")
+    fun findAllByCreatedAtBetween(
+        @Param("start") start: LocalDateTime,
+        @Param("end") end: LocalDateTime
+    ): List<CommunityPost>
+
     @Query("SELECT c FROM CommunityPost c WHERE c.language = 'ja' AND c.contentTranslated IS NULL")
     fun findAllNeedingTranslation(): List<CommunityPost>
 

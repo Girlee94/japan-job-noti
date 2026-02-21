@@ -20,6 +20,12 @@ interface JpaJobPostingRepository : JpaRepository<JobPosting, Long> {
     @Query("SELECT j FROM JobPosting j WHERE j.createdAt > :dateTime ORDER BY j.createdAt DESC")
     fun findAllByCreatedAtAfter(@Param("dateTime") dateTime: LocalDateTime): List<JobPosting>
 
+    @Query("SELECT j FROM JobPosting j WHERE j.createdAt BETWEEN :start AND :end ORDER BY j.createdAt DESC")
+    fun findAllByCreatedAtBetween(
+        @Param("start") start: LocalDateTime,
+        @Param("end") end: LocalDateTime
+    ): List<JobPosting>
+
     @Query("SELECT j FROM JobPosting j WHERE j.language = 'ja' AND j.titleTranslated IS NULL")
     fun findAllNeedingTranslation(): List<JobPosting>
 
