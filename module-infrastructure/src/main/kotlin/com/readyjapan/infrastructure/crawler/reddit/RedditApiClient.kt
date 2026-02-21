@@ -1,17 +1,23 @@
 package com.readyjapan.infrastructure.crawler.reddit
 
 import com.readyjapan.core.common.exception.ExternalApiException
+import com.readyjapan.infrastructure.crawler.config.CrawlerConfig
 import com.readyjapan.infrastructure.crawler.reddit.dto.RedditAuthResponse
 import com.readyjapan.infrastructure.crawler.reddit.dto.RedditListingResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.netty.channel.ChannelOption
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.netty.http.client.HttpClient
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -25,25 +31,32 @@ private val logger = KotlinLogging.logger {}
 @EnableConfigurationProperties(RedditProperties::class)
 class RedditApiClient(
     private val properties: RedditProperties,
+    crawlerConfig: CrawlerConfig,
     webClientBuilder: WebClient.Builder
 ) {
+    private data class TokenCache(val token: String, val expiresAt: Instant)
+
+    private val httpClient: HttpClient = HttpClient.create()
+        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (crawlerConfig.timeoutSeconds * 1000).toInt())
+        .responseTimeout(Duration.ofSeconds(crawlerConfig.timeoutSeconds))
+
     private val authClient: WebClient = webClientBuilder
         .clone()
         .baseUrl("https://www.reddit.com")
         .defaultHeader(HttpHeaders.USER_AGENT, properties.userAgent)
+        .clientConnector(ReactorClientHttpConnector(httpClient))
         .build()
 
     private val apiClient: WebClient = webClientBuilder
         .clone()
         .baseUrl("https://oauth.reddit.com")
         .defaultHeader(HttpHeaders.USER_AGENT, properties.userAgent)
+        .clientConnector(ReactorClientHttpConnector(httpClient))
         .build()
 
-    // 토큰 캐시
+    // 토큰 캐시 (불변 객체로 atomic write 보장)
     @Volatile
-    private var cachedToken: String? = null
-    @Volatile
-    private var tokenExpiresAt: Instant? = null
+    private var tokenCache: TokenCache? = null
 
     /**
      * OAuth2 액세스 토큰 획득
@@ -52,11 +65,10 @@ class RedditApiClient(
     private fun getAccessToken(): Mono<String> {
         // 캐시된 토큰이 유효하면 재사용
         val now = Instant.now()
-        val token = cachedToken
-        val expiresAt = tokenExpiresAt
-        if (token != null && expiresAt != null && now.isBefore(expiresAt)) {
+        val cache = tokenCache
+        if (cache != null && now.isBefore(cache.expiresAt)) {
             logger.debug { "Using cached Reddit access token" }
-            return Mono.just(token)
+            return Mono.just(cache.token)
         }
 
         if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
@@ -78,9 +90,11 @@ class RedditApiClient(
             .retrieve()
             .bodyToMono(RedditAuthResponse::class.java)
             .map { response ->
-                cachedToken = response.accessToken
                 // 만료 5분 전에 갱신하도록 설정
-                tokenExpiresAt = Instant.now().plusSeconds(response.expiresIn - 300)
+                tokenCache = TokenCache(
+                    token = response.accessToken,
+                    expiresAt = Instant.now().plusSeconds(response.expiresIn - 300)
+                )
                 logger.info { "Reddit access token acquired, expires in ${response.expiresIn}s" }
                 response.accessToken
             }
@@ -140,8 +154,7 @@ class RedditApiClient(
                         when (e.statusCode.value()) {
                             401 -> {
                                 // 토큰 만료 시 캐시 무효화
-                                cachedToken = null
-                                tokenExpiresAt = null
+                                tokenCache = null
                             }
                             403 -> logger.warn { "Reddit API access forbidden for r/$subreddit" }
                             404 -> logger.warn { "Subreddit not found: r/$subreddit" }
@@ -170,26 +183,16 @@ class RedditApiClient(
             return Mono.just(emptyList())
         }
 
-        return Mono.defer {
-            var result = Mono.just(mutableListOf<RedditListingResponse>())
-
-            for (subreddit in subreddits) {
-                result = result.flatMap { list ->
-                    getSubredditPosts(subreddit, sort, limit)
-                        .delayElement(java.time.Duration.ofMillis(properties.requestDelayMs))
-                        .map { response ->
-                            list.add(response)
-                            list
-                        }
-                        .onErrorResume { e ->
-                            logger.warn { "Skipping r/$subreddit due to error: ${e.message}" }
-                            Mono.just(list)
-                        }
-                }
+        return Flux.fromIterable(subreddits)
+            .concatMap { subreddit ->
+                getSubredditPosts(subreddit, sort, limit)
+                    .delayElement(Duration.ofMillis(properties.requestDelayMs))
+                    .onErrorResume { e ->
+                        logger.warn { "Skipping r/$subreddit due to error: ${e.message}" }
+                        Mono.empty()
+                    }
             }
-
-            result.map { it.toList() }
-        }
+            .collectList()
     }
 
     /**
