@@ -11,6 +11,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.Callable
 
 private val logger = KotlinLogging.logger {}
@@ -26,6 +27,10 @@ class LlmController(
     private val sentimentOrchestrationService: SentimentOrchestrationService,
     private val dailySummaryOrchestrationService: DailySummaryOrchestrationService
 ) {
+
+    companion object {
+        private val JST = ZoneId.of("Asia/Tokyo")
+    }
 
     /**
      * 번역 수동 트리거
@@ -70,7 +75,7 @@ class LlmController(
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         date: LocalDate?
     ): Callable<ApiResponse<DailySummaryResultDto>> {
-        val targetDate = date ?: LocalDate.now().minusDays(1)
+        val targetDate = date ?: LocalDate.now(JST).minusDays(1)
         logger.info { "Manual summary generation for: $targetDate" }
         return Callable {
             try {
@@ -92,7 +97,7 @@ class LlmController(
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         date: LocalDate?
     ): Callable<ApiResponse<DailySummaryResultDto>> {
-        val targetDate = date ?: LocalDate.now().minusDays(1)
+        val targetDate = date ?: LocalDate.now(JST).minusDays(1)
         logger.info { "Manual summary generation and send for: $targetDate" }
         return Callable {
             try {
