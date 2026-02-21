@@ -59,7 +59,6 @@ spring:
 
   datasource:
     # 로컬 개발: Supabase Pooler (Transaction Mode) 연결
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:6543/postgres}
     username: ${DB_USERNAME:postgres.your-tenant-id}
     password: ${DB_PASSWORD:your-super-secret-and-long-postgres-password}
 

@@ -17,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.netty.http.client.HttpClient
+import reactor.util.retry.Retry
 import java.time.Duration
 import java.time.Instant
 import java.util.*
@@ -36,9 +37,12 @@ class RedditApiClient(
 ) {
     private data class TokenCache(val token: String, val expiresAt: Instant)
 
-    private val httpClient: HttpClient = HttpClient.create()
-        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (crawlerConfig.timeoutSeconds * 1000).toInt())
-        .responseTimeout(Duration.ofSeconds(crawlerConfig.timeoutSeconds))
+    private val httpClient: HttpClient = run {
+        val timeoutMillis = Duration.ofSeconds(crawlerConfig.timeoutSeconds).toMillis()
+        HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeoutMillis.toInt())
+            .responseTimeout(Duration.ofMillis(timeoutMillis))
+    }
 
     private val authClient: WebClient = webClientBuilder
         .clone()
@@ -54,7 +58,7 @@ class RedditApiClient(
         .clientConnector(ReactorClientHttpConnector(httpClient))
         .build()
 
-    // 토큰 캐시 (불변 객체로 atomic write 보장)
+    // 토큰 캐시 (@Volatile로 스레드 간 가시성 보장, 중복 발급은 허용하는 benign race)
     @Volatile
     private var tokenCache: TokenCache? = null
 
@@ -63,45 +67,47 @@ class RedditApiClient(
      * Application-only (script) 방식 사용
      */
     private fun getAccessToken(): Mono<String> {
-        // 캐시된 토큰이 유효하면 재사용
-        val now = Instant.now()
-        val cache = tokenCache
-        if (cache != null && now.isBefore(cache.expiresAt)) {
-            logger.debug { "Using cached Reddit access token" }
-            return Mono.just(cache.token)
-        }
+        return Mono.defer {
+            // 캐시된 토큰이 유효하면 재사용
+            val now = Instant.now()
+            val cache = tokenCache
+            if (cache != null && now.isBefore(cache.expiresAt)) {
+                logger.debug { "Using cached Reddit access token" }
+                return@defer Mono.just(cache.token)
+            }
 
-        if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
-            return Mono.error(ExternalApiException("Reddit", "Client ID or Secret is not configured"))
-        }
+            if (properties.clientId.isBlank() || properties.clientSecret.isBlank()) {
+                return@defer Mono.error(ExternalApiException("Reddit", "Client ID or Secret is not configured"))
+            }
 
-        val credentials = Base64.getEncoder()
-            .encodeToString("${properties.clientId}:${properties.clientSecret}".toByteArray())
+            val credentials = Base64.getEncoder()
+                .encodeToString("${properties.clientId}:${properties.clientSecret}".toByteArray())
 
-        logger.debug { "Requesting new Reddit access token" }
+            logger.debug { "Requesting new Reddit access token" }
 
-        return authClient.post()
-            .uri("/api/v1/access_token")
-            .header(HttpHeaders.AUTHORIZATION, "Basic $credentials")
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-            .body(
-                BodyInserters.fromFormData("grant_type", "client_credentials")
-            )
-            .retrieve()
-            .bodyToMono(RedditAuthResponse::class.java)
-            .map { response ->
-                // 만료 5분 전에 갱신하도록 설정
-                tokenCache = TokenCache(
-                    token = response.accessToken,
-                    expiresAt = Instant.now().plusSeconds(response.expiresIn - 300)
+            authClient.post()
+                .uri("/api/v1/access_token")
+                .header(HttpHeaders.AUTHORIZATION, "Basic $credentials")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(
+                    BodyInserters.fromFormData("grant_type", "client_credentials")
                 )
-                logger.info { "Reddit access token acquired, expires in ${response.expiresIn}s" }
-                response.accessToken
-            }
-            .onErrorMap { e ->
-                logger.error(e) { "Failed to acquire Reddit access token" }
-                ExternalApiException("Reddit Auth", e.message, e)
-            }
+                .retrieve()
+                .bodyToMono(RedditAuthResponse::class.java)
+                .map { response ->
+                    // 만료 5분 전에 갱신하도록 설정
+                    tokenCache = TokenCache(
+                        token = response.accessToken,
+                        expiresAt = Instant.now().plusSeconds((response.expiresIn - 300).coerceAtLeast(0))
+                    )
+                    logger.info { "Reddit access token acquired, expires in ${response.expiresIn}s" }
+                    response.accessToken
+                }
+                .onErrorMap { e ->
+                    logger.error(e) { "Failed to acquire Reddit access token" }
+                    ExternalApiException("Reddit Auth", e.message, e)
+                }
+        }
     }
 
     /**
@@ -165,6 +171,12 @@ class RedditApiClient(
                 }
                 Mono.error(ExternalApiException("Reddit", "Failed to fetch r/$subreddit: ${e.message}", e))
             }
+            .retryWhen(
+                Retry.max(1)
+                    .filter { it is ExternalApiException && it.cause is WebClientResponseException &&
+                        (it.cause as WebClientResponseException).statusCode.value() == 401 }
+                    .doBeforeRetry { logger.info { "Retrying after 401 with fresh token for r/$subreddit" } }
+            )
     }
 
     /**

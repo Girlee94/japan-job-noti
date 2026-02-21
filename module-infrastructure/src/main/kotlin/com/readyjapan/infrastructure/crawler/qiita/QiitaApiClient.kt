@@ -52,6 +52,15 @@ class QiitaApiClient(
         }
         .build()
 
+    init {
+        if (properties.enabled && properties.accessToken.isBlank()) {
+            logger.warn {
+                "Qiita API is enabled without access token. " +
+                    "Rate limit will be 60 requests/hour. Set QIITA_ACCESS_TOKEN for 1000 requests/hour."
+            }
+        }
+    }
+
     /**
      * 태그로 기사 검색
      *
