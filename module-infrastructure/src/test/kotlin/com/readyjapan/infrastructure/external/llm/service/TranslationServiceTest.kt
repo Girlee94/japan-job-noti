@@ -1,6 +1,6 @@
 package com.readyjapan.infrastructure.external.llm.service
 
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
+import com.readyjapan.infrastructure.external.llm.LlmClient
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -13,10 +13,10 @@ import io.mockk.verify
 
 class TranslationServiceTest : BehaviorSpec({
 
-    val openAiClient = mockk<OpenAiClient>()
-    val translationService = TranslationService(openAiClient)
+    val llmClient = mockk<LlmClient>()
+    val translationService = TranslationService(llmClient)
 
-    beforeEach { clearMocks(openAiClient) }
+    beforeEach { clearMocks(llmClient) }
 
     Given("translate") {
         When("빈 텍스트 입력 시") {
@@ -24,13 +24,13 @@ class TranslationServiceTest : BehaviorSpec({
                 val result = translationService.translate("   ")
 
                 result.shouldBeNull()
-                verify(exactly = 0) { openAiClient.chatCompletion(any(), any(), any(), any()) }
+                verify(exactly = 0) { llmClient.chatCompletion(any(), any(), any(), any()) }
             }
         }
         When("정상 번역 시") {
             Then("번역 결과를 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), eq("日本のIT企業で働きたい"), any(), any())
+                    llmClient.chatCompletion(any(), eq("日本のIT企業で働きたい"), any(), any())
                 } returns "일본 IT 기업에서 일하고 싶다"
 
                 val result = translationService.translate("日本のIT企業で働きたい")
@@ -38,10 +38,10 @@ class TranslationServiceTest : BehaviorSpec({
                 result shouldBe "일본 IT 기업에서 일하고 싶다"
             }
         }
-        When("OpenAI null 응답 시") {
+        When("LLM null 응답 시") {
             Then("null을 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), eq("テスト"), any(), any())
+                    llmClient.chatCompletion(any(), eq("テスト"), any(), any())
                 } returns null
 
                 val result = translationService.translate("テスト")
@@ -55,10 +55,10 @@ class TranslationServiceTest : BehaviorSpec({
         When("제목과 내용 번역 시") {
             Then("번역된 제목과 내용을 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), eq("タイトル"), any(), any())
+                    llmClient.chatCompletion(any(), eq("タイトル"), any(), any())
                 } returns "제목"
                 every {
-                    openAiClient.chatCompletion(any(), eq("内容テスト"), any(), any())
+                    llmClient.chatCompletion(any(), eq("内容テスト"), any(), any())
                 } returns "내용 테스트"
 
                 val result = translationService.translateTitleAndContent("タイトル", "内容テスト")
@@ -70,7 +70,7 @@ class TranslationServiceTest : BehaviorSpec({
         When("content가 null일 때") {
             Then("translatedContent가 null이다") {
                 every {
-                    openAiClient.chatCompletion(any(), eq("タイトル"), any(), any())
+                    llmClient.chatCompletion(any(), eq("タイトル"), any(), any())
                 } returns "제목"
 
                 val result = translationService.translateTitleAndContent("タイトル", null)
@@ -90,7 +90,7 @@ class TranslationServiceTest : BehaviorSpec({
         When("단일 항목 시") {
             Then("translate에 위임한다") {
                 every {
-                    openAiClient.chatCompletion(any(), eq("テスト"), any(), any())
+                    llmClient.chatCompletion(any(), eq("テスト"), any(), any())
                 } returns "테스트"
 
                 val result = translationService.translateBatch(listOf("テスト"))
@@ -102,7 +102,7 @@ class TranslationServiceTest : BehaviorSpec({
         When("여러 항목 정상 파싱 시") {
             Then("파싱된 번역 리스트를 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "[1] 테스트1\n[2] 테스트2"
 
                 val result = translationService.translateBatch(listOf("テスト1", "テスト2"))
@@ -112,10 +112,10 @@ class TranslationServiceTest : BehaviorSpec({
                 result[1] shouldBe "테스트2"
             }
         }
-        When("OpenAI null 응답 시") {
+        When("LLM null 응답 시") {
             Then("null 리스트를 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns null
 
                 val result = translationService.translateBatch(listOf("テスト1", "テスト2"))

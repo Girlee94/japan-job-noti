@@ -1,7 +1,7 @@
 package com.readyjapan.infrastructure.external.llm.service
 
 import com.readyjapan.core.domain.entity.enums.Sentiment
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
+import com.readyjapan.infrastructure.external.llm.LlmClient
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -13,10 +13,10 @@ import io.mockk.verify
 
 class SentimentAnalysisServiceTest : BehaviorSpec({
 
-    val openAiClient = mockk<OpenAiClient>()
-    val sentimentAnalysisService = SentimentAnalysisService(openAiClient)
+    val llmClient = mockk<LlmClient>()
+    val sentimentAnalysisService = SentimentAnalysisService(llmClient)
 
-    beforeEach { clearMocks(openAiClient) }
+    beforeEach { clearMocks(llmClient) }
 
     Given("analyze") {
         When("빈 텍스트 입력 시") {
@@ -24,13 +24,13 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
                 val result = sentimentAnalysisService.analyze("   ")
 
                 result.sentiment shouldBe Sentiment.NEUTRAL
-                verify(exactly = 0) { openAiClient.chatCompletion(any(), any(), any(), any()) }
+                verify(exactly = 0) { llmClient.chatCompletion(any(), any(), any(), any()) }
             }
         }
         When("POSITIVE 응답 시") {
             Then("POSITIVE를 파싱한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "POSITIVE\n채용 증가 소식입니다."
 
                 val result = sentimentAnalysisService.analyze("좋은 소식입니다")
@@ -42,7 +42,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("NEGATIVE 응답 시") {
             Then("NEGATIVE를 파싱한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "NEGATIVE\n취업 시장이 어렵습니다."
 
                 val result = sentimentAnalysisService.analyze("어려운 상황입니다")
@@ -53,7 +53,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("NEUTRAL 응답 시") {
             Then("NEUTRAL을 파싱한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "NEUTRAL\n단순 정보 전달입니다."
 
                 val result = sentimentAnalysisService.analyze("정보입니다")
@@ -64,7 +64,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("null 응답 시") {
             Then("NEUTRAL과 '응답 없음'을 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns null
 
                 val result = sentimentAnalysisService.analyze("테스트")
@@ -79,7 +79,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("제목만 있을 때") {
             Then("정상 분석한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "POSITIVE\n좋은 소식"
 
                 val result = sentimentAnalysisService.analyzeWithContext("좋은 뉴스", null)
@@ -90,7 +90,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("제목과 내용 모두 있을 때") {
             Then("정상 분석한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "NEGATIVE\n부정적 내용"
 
                 val result = sentimentAnalysisService.analyzeWithContext("뉴스 제목", "부정적인 내용입니다")
@@ -109,7 +109,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("단일 항목 시") {
             Then("analyze에 위임한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "POSITIVE\n좋은 소식"
 
                 val result = sentimentAnalysisService.analyzeBatch(listOf("좋은 소식입니다"))
@@ -121,7 +121,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("여러 항목 정상 파싱 시") {
             Then("파싱된 감정 리스트를 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "[1] POSITIVE: 채용 증가\n[2] NEGATIVE: 경기 침체\n[3] NEUTRAL: 정보 전달"
 
                 val result = sentimentAnalysisService.analyzeBatch(listOf("텍스트1", "텍스트2", "텍스트3"))
@@ -135,7 +135,7 @@ class SentimentAnalysisServiceTest : BehaviorSpec({
         When("null 응답 시") {
             Then("모두 NEUTRAL을 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns null
 
                 val result = sentimentAnalysisService.analyzeBatch(listOf("텍스트1", "텍스트2"))

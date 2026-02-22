@@ -86,6 +86,23 @@ spring:
       ddl-auto: validate
     show-sql: true
 
+app:
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    enabled: false
+
+  llm:
+    provider: ${LLM_PROVIDER:gemini}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gemini-2.0-flash}
+    enabled: false
+
+  reddit:
+    client-id: ${REDDIT_CLIENT_ID:}
+    client-secret: ${REDDIT_CLIENT_SECRET:}
+    user-agent: "ReadyJapan/1.0"
+
 ---
 spring:
   config:
@@ -111,5 +128,21 @@ logging:
     com.readyjapan: INFO
 
 app:
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN}
+    chat-id: ${TELEGRAM_CHAT_ID}
+    enabled: true
+
+  llm:
+    provider: ${LLM_PROVIDER:gemini}
+    api-key: ${LLM_API_KEY}
+    model: ${LLM_MODEL:gemini-2.0-flash}
+    enabled: true
+
+  reddit:
+    client-id: ${REDDIT_CLIENT_ID}
+    client-secret: ${REDDIT_CLIENT_SECRET}
+    user-agent: "ReadyJapan/1.0"
+
   qiita:
     access-token: ${QIITA_ACCESS_TOKEN}
