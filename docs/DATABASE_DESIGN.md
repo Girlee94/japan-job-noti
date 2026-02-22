@@ -86,7 +86,7 @@ CREATE INDEX idx_crawl_sources_type ON crawl_sources(source_type);
 | platform | VARCHAR(20) | X | 세부 플랫폼 (REDDIT, TWITTER, QIITA 등) |
 | cron_expression | VARCHAR(50) | X | 크롤링 주기 |
 | enabled | BOOLEAN | O | 활성화 여부 |
-| config | JSONB | X | 추가 설정 (API 키, 필터 조건 등) |
+| config | JSONB | X | 추가 설정 (필터 조건 등, 민감 정보는 환경변수로 관리) |
 | last_crawled_at | TIMESTAMP | X | 마지막 크롤링 시각 |
 | created_at | TIMESTAMP | O | 생성일 |
 | updated_at | TIMESTAMP | O | 수정일 |
@@ -128,7 +128,7 @@ enum class CommunityPlatform {
 ```sql
 CREATE TABLE job_postings (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id),
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     title VARCHAR(500) NOT NULL,
     title_translated VARCHAR(500),
@@ -215,7 +215,7 @@ enum class PostingStatus {
 ```sql
 CREATE TABLE news_articles (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id),
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     title VARCHAR(500) NOT NULL,
     title_translated VARCHAR(500),
@@ -273,7 +273,7 @@ CREATE INDEX idx_news_articles_category ON news_articles(category);
 ```sql
 CREATE TABLE community_posts (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id),
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     external_id VARCHAR(200) NOT NULL,
     platform VARCHAR(20) NOT NULL,
     title VARCHAR(500),
@@ -286,7 +286,7 @@ CREATE TABLE community_posts (
     tags JSONB,
     like_count INT DEFAULT 0,
     comment_count INT DEFAULT 0,
-    share_count INT DEFAULT 0,
+    share_count INT DEFAULT 0 NOT NULL,
     sentiment VARCHAR(20),
     language VARCHAR(10) DEFAULT 'ja',
     published_at TIMESTAMP NOT NULL,
@@ -321,7 +321,7 @@ CREATE INDEX idx_community_posts_like ON community_posts(like_count DESC);
 | tags | JSONB | X | 태그/플레어 |
 | like_count | INT | O | 좋아요/업보트 수 |
 | comment_count | INT | O | 댓글 수 |
-| share_count | INT | X | 공유/리트윗 수 |
+| share_count | INT | O | 공유/리트윗 수 |
 | sentiment | VARCHAR(20) | X | 감정 분석 결과 |
 | language | VARCHAR(10) | O | 원본 언어 |
 | published_at | TIMESTAMP | O | 게시 시각 |
@@ -349,7 +349,7 @@ enum class Sentiment {
 ```sql
 CREATE TABLE crawl_histories (
     id BIGSERIAL PRIMARY KEY,
-    source_id BIGINT NOT NULL REFERENCES crawl_sources(id),
+    source_id BIGINT NOT NULL REFERENCES crawl_sources(id) ON DELETE RESTRICT,
     status VARCHAR(20) NOT NULL,
     items_found INT DEFAULT 0,
     items_saved INT DEFAULT 0,
@@ -542,7 +542,7 @@ enum class SummaryStatus {
 
 ### 번역 프로세스
 1. `language = 'ja'`인 데이터만 번역 대상
-2. LLM API (OpenAI/Claude)를 통한 번역
+2. LLM API (Gemini/OpenAI)를 통한 번역
 3. 번역 완료 시 `*_translated` 필드에 저장
 4. `crawl_histories.items_translated`에 번역 건수 기록
 
@@ -588,3 +588,4 @@ INSERT INTO crawl_sources (name, url, source_type, platform, enabled) VALUES
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 1.0 | 2024-XX-XX | 초기 설계 |
+| 2.0 | 2026-02-22 | FK ON DELETE RESTRICT 적용, share_count NOT NULL, config 코멘트 보안 개선 |
