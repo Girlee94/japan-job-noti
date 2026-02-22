@@ -7,14 +7,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  */
 @ConfigurationProperties(prefix = "app.llm")
 data class LlmProperties(
-    /** LLM 제공자 (openai, anthropic) */
-    val provider: String = "openai",
+    /** LLM 제공자 (gemini, openai) */
+    val provider: String = "gemini",
 
     /** API Key */
     val apiKey: String = "",
 
     /** 사용할 모델 */
-    val model: String = "gpt-4o-mini",
+    val model: String = "gemini-2.0-flash",
 
     /** API 활성화 여부 */
     val enabled: Boolean = true,
@@ -27,4 +27,18 @@ data class LlmProperties(
 
     /** Temperature (창의성 조절, 0.0 ~ 2.0) */
     val temperature: Double = 0.3
-)
+) {
+    init {
+        require(provider in SUPPORTED_PROVIDERS) {
+            "Unsupported LLM provider: '$provider'. Supported values: $SUPPORTED_PROVIDERS"
+        }
+    }
+
+    override fun toString(): String =
+        "LlmProperties(provider=$provider, apiKey=***, model=$model, enabled=$enabled, " +
+            "timeoutSeconds=$timeoutSeconds, maxTokens=$maxTokens, temperature=$temperature)"
+
+    companion object {
+        private val SUPPORTED_PROVIDERS = setOf("gemini", "openai")
+    }
+}

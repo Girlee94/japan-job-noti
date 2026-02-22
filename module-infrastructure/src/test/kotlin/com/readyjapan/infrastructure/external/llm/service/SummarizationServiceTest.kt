@@ -6,7 +6,7 @@ import com.readyjapan.core.domain.entity.JobPosting
 import com.readyjapan.core.domain.entity.NewsArticle
 import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.SourceType
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
+import com.readyjapan.infrastructure.external.llm.LlmClient
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -18,10 +18,10 @@ import java.time.LocalDateTime
 
 class SummarizationServiceTest : BehaviorSpec({
 
-    val openAiClient = mockk<OpenAiClient>()
-    val summarizationService = SummarizationService(openAiClient)
+    val llmClient = mockk<LlmClient>()
+    val summarizationService = SummarizationService(llmClient)
 
-    beforeEach { clearMocks(openAiClient) }
+    beforeEach { clearMocks(llmClient) }
 
     fun createSource(type: SourceType = SourceType.COMMUNITY): CrawlSource = CrawlSource(
         id = 1L,
@@ -59,7 +59,7 @@ class SummarizationServiceTest : BehaviorSpec({
         When("정상 요약 생성 시") {
             Then("success true를 반환한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "## 오늘의 하이라이트\n요약 내용입니다."
 
                 val result = summarizationService.generateDailySummary(
@@ -77,10 +77,10 @@ class SummarizationServiceTest : BehaviorSpec({
                 result.stats.totalCount shouldBe 3
             }
         }
-        When("OpenAI null 응답 시") {
+        When("LLM null 응답 시") {
             Then("fallback 요약을 생성한다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns null
 
                 val result = summarizationService.generateDailySummary(
@@ -99,7 +99,7 @@ class SummarizationServiceTest : BehaviorSpec({
         When("빈 데이터 시") {
             Then("정상 처리된다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns "데이터가 없는 날의 요약입니다."
 
                 val result = summarizationService.generateDailySummary(
@@ -116,7 +116,7 @@ class SummarizationServiceTest : BehaviorSpec({
         When("fallback 요약 생성 시") {
             Then("회사명이 포함된다") {
                 every {
-                    openAiClient.chatCompletion(any(), any(), any(), any())
+                    llmClient.chatCompletion(any(), any(), any(), any())
                 } returns null
 
                 val result = summarizationService.generateDailySummary(

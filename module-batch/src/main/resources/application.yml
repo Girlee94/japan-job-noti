@@ -74,9 +74,9 @@ app:
     enabled: false
 
   llm:
-    provider: ${LLM_PROVIDER:openai}
-    api-key: ${OPENAI_API_KEY:}
-    model: ${LLM_MODEL:gpt-4o-mini}
+    provider: ${LLM_PROVIDER:gemini}
+    api-key: ${GEMINI_API_KEY:}
+    model: ${LLM_MODEL:gemini-2.0-flash}
     enabled: false
 
   crawler:
@@ -123,9 +123,9 @@ app:
     enabled: true
 
   llm:
-    provider: ${LLM_PROVIDER:openai}
-    api-key: ${OPENAI_API_KEY}
-    model: ${LLM_MODEL:gpt-4o-mini}
+    provider: ${LLM_PROVIDER:gemini}
+    api-key: ${GEMINI_API_KEY}
+    model: ${LLM_MODEL:gemini-2.0-flash}
     enabled: true
 
   reddit:

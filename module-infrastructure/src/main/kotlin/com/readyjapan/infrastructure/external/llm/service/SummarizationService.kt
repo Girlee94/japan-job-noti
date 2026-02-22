@@ -3,8 +3,8 @@ package com.readyjapan.infrastructure.external.llm.service
 import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.entity.JobPosting
 import com.readyjapan.core.domain.entity.NewsArticle
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
-import org.slf4j.LoggerFactory
+import com.readyjapan.infrastructure.external.llm.LlmClient
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -14,9 +14,9 @@ import java.time.format.DateTimeFormatter
  */
 @Service
 class SummarizationService(
-    private val openAiClient: OpenAiClient
+    private val llmClient: LlmClient
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log = KotlinLogging.logger {}
 
     companion object {
         private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")
@@ -58,11 +58,11 @@ class SummarizationService(
         communityPosts: List<CommunityPost>
     ): DailySummaryResult {
         val dateStr = date.format(DATE_FORMATTER)
-        log.info("Generating daily summary for: $dateStr")
+        log.info { "Generating daily summary for: $dateStr" }
 
         val inputData = buildInputData(dateStr, jobPostings, newsArticles, communityPosts)
 
-        val response = openAiClient.chatCompletion(
+        val response = llmClient.chatCompletion(
             systemPrompt = SYSTEM_PROMPT,
             userPrompt = inputData,
             temperature = 0.5, // 요약은 약간의 창의성 허용
@@ -70,7 +70,7 @@ class SummarizationService(
         )
 
         return if (response != null) {
-            log.info("Daily summary generated successfully")
+            log.info { "Daily summary generated successfully" }
             DailySummaryResult(
                 summary = response,
                 success = true,
@@ -81,7 +81,7 @@ class SummarizationService(
                 )
             )
         } else {
-            log.error("Failed to generate daily summary")
+            log.error { "Failed to generate daily summary" }
             DailySummaryResult(
                 summary = generateFallbackSummary(dateStr, jobPostings, newsArticles, communityPosts),
                 success = false,

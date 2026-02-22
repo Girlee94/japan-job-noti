@@ -1,8 +1,8 @@
 package com.readyjapan.infrastructure.external.llm.service
 
 import com.readyjapan.core.domain.entity.enums.Sentiment
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
-import org.slf4j.LoggerFactory
+import com.readyjapan.infrastructure.external.llm.LlmClient
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 
 /**
@@ -10,9 +10,9 @@ import org.springframework.stereotype.Service
  */
 @Service
 class SentimentAnalysisService(
-    private val openAiClient: OpenAiClient
+    private val llmClient: LlmClient
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log = KotlinLogging.logger {}
 
     companion object {
         private const val SYSTEM_PROMPT = """당신은 일본 IT 취업 관련 텍스트의 감정을 분석하는 전문가입니다.
@@ -39,9 +39,9 @@ POSITIVE
             return SentimentResult(Sentiment.NEUTRAL, "빈 텍스트입니다.")
         }
 
-        log.debug("Analyzing sentiment for: ${text.take(50)}...")
+        log.debug { "Analyzing sentiment for: ${text.take(50)}..." }
 
-        val response = openAiClient.chatCompletion(
+        val response = llmClient.chatCompletion(
             systemPrompt = SYSTEM_PROMPT,
             userPrompt = text,
             temperature = 0.1
@@ -96,7 +96,7 @@ POSITIVE
 [2] NEUTRAL: 단순 정보 질문
 [3] NEGATIVE: 취업 어려움 호소"""
 
-        val response = openAiClient.chatCompletion(
+        val response = llmClient.chatCompletion(
             systemPrompt = batchSystemPrompt,
             userPrompt = numberedTexts,
             temperature = 0.1,
@@ -129,14 +129,11 @@ POSITIVE
     }
 
     private fun parseBatchResponse(response: String, expectedCount: Int): List<SentimentResult> {
-        val results = mutableListOf<SentimentResult>()
         val lines = response.split("\n")
 
-        for (i in 1..expectedCount) {
+        return (1..expectedCount).map { i ->
             val pattern = "\\[$i\\]\\s*(POSITIVE|NEGATIVE|NEUTRAL)[:\\s]*(.*)".toRegex(RegexOption.IGNORE_CASE)
-            val match = lines.firstNotNullOfOrNull { line ->
-                pattern.find(line)
-            }
+            val match = lines.firstNotNullOfOrNull { line -> pattern.find(line) }
 
             if (match != null) {
                 val sentiment = when (match.groupValues[1].uppercase()) {
@@ -144,14 +141,11 @@ POSITIVE
                     "NEGATIVE" -> Sentiment.NEGATIVE
                     else -> Sentiment.NEUTRAL
                 }
-                val reason = match.groupValues[2].trim()
-                results.add(SentimentResult(sentiment, reason))
+                SentimentResult(sentiment, match.groupValues[2].trim())
             } else {
-                results.add(SentimentResult(Sentiment.NEUTRAL, "파싱 실패"))
+                SentimentResult(Sentiment.NEUTRAL, "파싱 실패")
             }
         }
-
-        return results
     }
 }
 

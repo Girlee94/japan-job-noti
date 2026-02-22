@@ -1,7 +1,7 @@
 package com.readyjapan.infrastructure.external.llm.service
 
-import com.readyjapan.infrastructure.external.llm.OpenAiClient
-import org.slf4j.LoggerFactory
+import com.readyjapan.infrastructure.external.llm.LlmClient
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 
 /**
@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service
  */
 @Service
 class TranslationService(
-    private val openAiClient: OpenAiClient
+    private val llmClient: LlmClient
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
+    private val log = KotlinLogging.logger {}
 
     companion object {
         private const val SYSTEM_PROMPT = """당신은 일본어를 한국어로 번역하는 전문 번역가입니다.
@@ -32,9 +32,9 @@ class TranslationService(
             return null
         }
 
-        log.debug("Translating text: ${text.take(50)}...")
+        log.debug { "Translating text: ${text.take(50)}..." }
 
-        return openAiClient.chatCompletion(
+        return llmClient.chatCompletion(
             systemPrompt = SYSTEM_PROMPT,
             userPrompt = text,
             temperature = 0.1 // 번역은 일관성을 위해 낮은 temperature 사용
@@ -79,7 +79,7 @@ class TranslationService(
 3. IT/기술 용어는 한국에서 일반적으로 사용하는 표현으로 번역합니다.
 4. 회사명, 서비스명 등 고유명사는 그대로 유지합니다."""
 
-        val response = openAiClient.chatCompletion(
+        val response = llmClient.chatCompletion(
             systemPrompt = batchSystemPrompt,
             userPrompt = numberedTexts,
             temperature = 0.1,
@@ -94,18 +94,14 @@ class TranslationService(
     }
 
     private fun parseBatchResponse(response: String, expectedCount: Int): List<String?> {
-        val results = mutableListOf<String?>()
         val lines = response.split("\n")
 
-        for (i in 1..expectedCount) {
+        return (1..expectedCount).map { i ->
             val pattern = "\\[$i\\]\\s*(.+)".toRegex()
-            val match = lines.firstNotNullOfOrNull { line ->
+            lines.firstNotNullOfOrNull { line ->
                 pattern.find(line)?.groupValues?.get(1)
-            }
-            results.add(match?.trim())
+            }?.trim()
         }
-
-        return results
     }
 }
 
