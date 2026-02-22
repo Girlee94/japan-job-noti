@@ -76,7 +76,7 @@ app:
   llm:
     provider: ${LLM_PROVIDER:gemini}
     api-key: ${LLM_API_KEY:}
-    model: ${LLM_MODEL:gemini-2.0-flash}
+    model: ${LLM_MODEL:gemini-2.5-flash}
     enabled: false
 
   crawler:
@@ -125,7 +125,7 @@ app:
   llm:
     provider: ${LLM_PROVIDER:gemini}
     api-key: ${LLM_API_KEY}
-    model: ${LLM_MODEL:gemini-2.0-flash}
+    model: ${LLM_MODEL:gemini-2.5-flash}
     enabled: true
 
   reddit:

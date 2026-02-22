@@ -19,7 +19,7 @@ class GeminiClientTest : BehaviorSpec({
     val llmProperties = LlmProperties(
         provider = "gemini",
         apiKey = "test-api-key",
-        model = "gemini-2.0-flash",
+        model = "gemini-2.5-flash",
         enabled = true,
         timeoutSeconds = 5,
         maxTokens = 2000,

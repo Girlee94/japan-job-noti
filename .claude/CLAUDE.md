@@ -69,7 +69,7 @@ TELEGRAM_CHAT_ID=
 # LLM (Gemini 기본, OpenAI 대안)
 LLM_PROVIDER=gemini
 LLM_API_KEY=
-LLM_MODEL=gemini-2.0-flash
+LLM_MODEL=gemini-2.5-flash
 
 # Reddit OAuth2
 REDDIT_CLIENT_ID=

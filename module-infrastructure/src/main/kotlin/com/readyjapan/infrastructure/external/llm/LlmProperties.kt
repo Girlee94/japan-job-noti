@@ -14,7 +14,7 @@ data class LlmProperties(
     val apiKey: String = "",
 
     /** 사용할 모델 */
-    val model: String = "gemini-2.0-flash",
+    val model: String = "gemini-2.5-flash",
 
     /** API 활성화 여부 */
     val enabled: Boolean = true,

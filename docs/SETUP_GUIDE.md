@@ -99,7 +99,7 @@ REDDIT_CLIENT_SECRET=your_client_secret
 ```bash
 LLM_PROVIDER=gemini
 LLM_API_KEY=<your-api-key>
-LLM_MODEL=gemini-2.0-flash
+LLM_MODEL=gemini-2.5-flash
 ```
 
 ### 4.2 OpenAI API (대안)
@@ -118,8 +118,8 @@ LLM_MODEL=gpt-4o-mini
 
 | Provider | 모델 | 용도 | 비용 |
 |----------|------|------|------|
-| Gemini | gemini-2.0-flash | 번역, 감정분석, 요약 (기본) | 무료 티어 제공 |
-| Gemini | gemini-2.0-flash-lite | 경량 작업 | 무료 티어 제공 |
+| Gemini | gemini-2.5-flash | 번역, 감정분석, 요약 (기본) | 무료 티어 제공 |
+| Gemini | gemini-2.5-flash-lite | 경량 작업 | 무료 티어 제공 |
 | OpenAI | gpt-4o-mini | 번역, 감정분석 | 유료 |
 | OpenAI | gpt-4o | 복잡한 요약 | 유료 (중간) |
 
