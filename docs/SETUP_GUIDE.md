@@ -49,7 +49,7 @@ psql -h localhost -p 5432 -U postgres -d postgres
 2. `/newbot` 명령어 입력
 3. Bot 이름 입력 (예: Ready Japan Bot)
 4. Bot username 입력 (예: ready_japan_bot)
-5. **Bot Token** 저장 (예: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+5. **Bot Token** 저장
 
 ### 2.2 Chat ID 확인
 
@@ -60,8 +60,8 @@ psql -h localhost -p 5432 -U postgres -d postgres
 ### 2.3 환경 변수 설정
 
 ```bash
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
-TELEGRAM_CHAT_ID=123456789
+TELEGRAM_BOT_TOKEN=<your-bot-token>
+TELEGRAM_CHAT_ID=<your-chat-id>
 ```
 
 ---
@@ -90,7 +90,19 @@ REDDIT_CLIENT_SECRET=your_client_secret
 
 ## 4. LLM API 설정
 
-### 4.1 OpenAI API (권장)
+### 4.1 Google Gemini API (기본)
+
+1. https://aistudio.google.com 접속
+2. API Keys 메뉴에서 새 키 생성
+3. 환경 변수 설정:
+
+```bash
+LLM_PROVIDER=gemini
+LLM_API_KEY=<your-api-key>
+LLM_MODEL=gemini-2.5-flash
+```
+
+### 4.2 OpenAI API (대안)
 
 1. https://platform.openai.com 접속
 2. API Keys 메뉴에서 새 키 생성
@@ -98,17 +110,18 @@ REDDIT_CLIENT_SECRET=your_client_secret
 
 ```bash
 LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-...
+LLM_API_KEY=<your-api-key>
 LLM_MODEL=gpt-4o-mini
 ```
 
-### 4.2 모델 선택 가이드
+### 4.3 모델 선택 가이드
 
-| 모델 | 용도 | 비용 |
-|------|------|------|
-| gpt-4o-mini | 번역, 감정분석 (권장) | 저렴 |
-| gpt-4o | 복잡한 요약 | 중간 |
-| gpt-4-turbo | 최고 품질 | 높음 |
+| Provider | 모델 | 용도 | 비용 |
+|----------|------|------|------|
+| Gemini | gemini-2.5-flash | 번역, 감정분석, 요약 (기본) | 무료 티어 제공 |
+| Gemini | gemini-2.5-flash-lite | 경량 작업 | 무료 티어 제공 |
+| OpenAI | gpt-4o-mini | 번역, 감정분석 | 유료 |
+| OpenAI | gpt-4o | 복잡한 요약 | 유료 (중간) |
 
 ---
 

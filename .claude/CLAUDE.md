@@ -39,8 +39,8 @@ ready-japan/
 6. Null 처리는 Elvis 연산자, Safe call 활용 (`!!` 금지)
 
 ## 핵심 기능
-1. **데이터 수집**: Reddit 크롤러 (`RedditApiClient` — OAuth2 client_credentials, 08:00/18:00 JST)
-2. **번역**: `TranslationService` — OpenAI로 일→한 번역 (30분 간격 배치)
+1. **데이터 수집**: Reddit 크롤러 (OAuth2 client_credentials), Qiita 크롤러 (Bearer personal access token) — 08:00/18:00 JST
+2. **번역**: `TranslationService` — LLM(Gemini/OpenAI)으로 일→한 번역 (30분 간격 배치)
 3. **감정 분석**: `SentimentAnalysisService` — 커뮤니티 게시글 감정 분류 (30분 간격 배치)
 4. **일간 요약**: `SummarizationService` — 전일 데이터 LLM 요약 생성 (09:00 JST)
 5. **알림 발송**: `TelegramClient` — 일간 요약 텔레그램 전송
@@ -66,8 +66,10 @@ DB_PASSWORD=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 
-# LLM
-OPENAI_API_KEY=
+# LLM (Gemini 기본, OpenAI 대안)
+LLM_PROVIDER=gemini
+LLM_API_KEY=
+LLM_MODEL=gemini-2.5-flash
 
 # Reddit OAuth2
 REDDIT_CLIENT_ID=
