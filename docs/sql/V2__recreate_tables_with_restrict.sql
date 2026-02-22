@@ -38,7 +38,7 @@ CREATE TABLE crawl_sources (
 COMMENT ON TABLE crawl_sources IS '크롤링 소스 관리 테이블';
 COMMENT ON COLUMN crawl_sources.source_type IS 'JOB_SITE, NEWS_SITE, COMMUNITY, API';
 COMMENT ON COLUMN crawl_sources.platform IS 'REDDIT, TWITTER, QIITA, ZENN, NOTE, DISCORD, FIVECH, OTHER';
-COMMENT ON COLUMN crawl_sources.config IS '추가 설정 (API 키, 필터 조건 등)';
+COMMENT ON COLUMN crawl_sources.config IS '추가 설정 (필터 조건 등, 민감 정보는 환경변수로 관리)';
 
 CREATE INDEX idx_crawl_sources_enabled ON crawl_sources(enabled);
 CREATE INDEX idx_crawl_sources_type ON crawl_sources(source_type);
@@ -126,7 +126,7 @@ CREATE TABLE community_posts (
     tags JSONB,
     like_count INT DEFAULT 0 NOT NULL,
     comment_count INT DEFAULT 0 NOT NULL,
-    share_count INT DEFAULT 0,
+    share_count INT DEFAULT 0 NOT NULL,
     sentiment VARCHAR(20),
     language VARCHAR(10) DEFAULT 'ja' NOT NULL,
     published_at TIMESTAMP NOT NULL,

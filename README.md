@@ -81,7 +81,7 @@ REDDIT_CLIENT_ID=<client-id>
 REDDIT_CLIENT_SECRET=<client-secret>
 
 # LLM (Gemini)
-GEMINI_API_KEY=<api-key>
+LLM_API_KEY=<api-key>
 LLM_MODEL=gemini-2.0-flash
 
 # Telegram

@@ -75,7 +75,7 @@ app:
 
   llm:
     provider: ${LLM_PROVIDER:gemini}
-    api-key: ${GEMINI_API_KEY:}
+    api-key: ${LLM_API_KEY:}
     model: ${LLM_MODEL:gemini-2.0-flash}
     enabled: false
 
@@ -124,7 +124,7 @@ app:
 
   llm:
     provider: ${LLM_PROVIDER:gemini}
-    api-key: ${GEMINI_API_KEY}
+    api-key: ${LLM_API_KEY}
     model: ${LLM_MODEL:gemini-2.0-flash}
     enabled: true
 
