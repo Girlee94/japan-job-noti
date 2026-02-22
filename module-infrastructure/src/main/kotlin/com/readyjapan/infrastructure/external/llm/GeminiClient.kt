@@ -27,7 +27,7 @@ class GeminiClient(
     private val log = KotlinLogging.logger {}
 
     private val webClient: WebClient = webClientBuilder
-        .baseUrl("https://generativelanguage.googleapis.com/v1")
+        .baseUrl("https://generativelanguage.googleapis.com/v1beta")
         .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
         .build()
 
