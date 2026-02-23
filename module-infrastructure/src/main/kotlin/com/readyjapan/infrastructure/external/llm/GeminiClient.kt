@@ -55,7 +55,11 @@ class GeminiClient(
 
         return try {
             val response = webClient.post()
-                .uri("/models/${llmProperties.model}:generateContent")
+                .uri { uriBuilder ->
+                    uriBuilder
+                        .path("/models/{model}:generateContent")
+                        .build(mapOf("model" to llmProperties.model))
+                }
                 .header("x-goog-api-key", llmProperties.apiKey)
                 .bodyValue(request)
                 .retrieve()
