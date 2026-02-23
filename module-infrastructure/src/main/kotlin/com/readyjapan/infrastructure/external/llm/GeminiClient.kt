@@ -27,7 +27,7 @@ class GeminiClient(
     private val log = KotlinLogging.logger {}
 
     private val webClient: WebClient = webClientBuilder
-        .baseUrl("https://generativelanguage.googleapis.com/v1")
+        .baseUrl("https://generativelanguage.googleapis.com/v1beta")
         .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
         .build()
 
@@ -55,7 +55,11 @@ class GeminiClient(
 
         return try {
             val response = webClient.post()
-                .uri("/models/${llmProperties.model}:generateContent")
+                .uri { uriBuilder ->
+                    uriBuilder
+                        .path("/models/{model}:generateContent")
+                        .build(mapOf("model" to llmProperties.model))
+                }
                 .header("x-goog-api-key", llmProperties.apiKey)
                 .bodyValue(request)
                 .retrieve()

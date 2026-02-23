@@ -5,6 +5,10 @@ spring:
   profiles:
     active: local
 
+  mvc:
+    async:
+      request-timeout: 300000  # 5분 (LLM 배치 작업용)
+
   datasource:
     driver-class-name: org.postgresql.Driver
     # Supabase PostgreSQL (Transaction Pooler 사용)
@@ -113,6 +117,10 @@ spring:
     url: ${DATABASE_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+  mvc:
+    async:
+      request-timeout: 300000  # 5분 (LLM 배치 작업용)
 
   jpa:
     hibernate:

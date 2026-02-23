@@ -12,7 +12,10 @@ import io.mockk.every
 import io.mockk.mockk
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.util.UriBuilder
 import reactor.core.publisher.Mono
+import java.net.URI
+import java.util.function.Function
 
 class GeminiClientTest : BehaviorSpec({
 
@@ -32,7 +35,7 @@ class GeminiClientTest : BehaviorSpec({
         val requestHeadersSpec = mockk<WebClient.RequestHeadersSpec<*>>()
         val responseSpec = mockk<WebClient.ResponseSpec>()
 
-        every { requestBodyUriSpec.uri(any<String>()) } returns requestBodySpec
+        every { requestBodyUriSpec.uri(any<Function<UriBuilder, URI>>()) } returns requestBodySpec
         every { requestBodySpec.header(any(), any()) } returns requestBodySpec
         every { requestBodySpec.bodyValue(any()) } returns requestHeadersSpec
         every { requestHeadersSpec.retrieve() } returns responseSpec
