@@ -33,6 +33,7 @@ class RedditCrawlerService(
 ) {
     companion object {
         private val OBJECT_MAPPER = jacksonObjectMapper()
+        private const val API_TIMEOUT_SECONDS = 30L
         private val SUBREDDIT_URL_PATTERN = Regex("reddit\\.com/r/([a-zA-Z0-9_]+)")
 
         // 일본 취업 관련 키워드
@@ -92,7 +93,7 @@ class RedditCrawlerService(
 
             // HTTP 호출 (트랜잭션 밖에서 수행)
             val response = redditApiClient.getSubredditPosts(subreddit, sort, limit)
-                .block()
+                .block(Duration.ofSeconds(API_TIMEOUT_SECONDS))
 
             if (response == null) {
                 history.fail("No response from Reddit API")
