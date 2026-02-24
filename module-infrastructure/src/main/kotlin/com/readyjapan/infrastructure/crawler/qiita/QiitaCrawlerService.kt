@@ -117,7 +117,7 @@ class QiitaCrawlerService(
             val freshItems = uniqueItems.filter { item ->
                 try {
                     val itemInstant = OffsetDateTime.parse(item.createdAt).toInstant()
-                    itemInstant.isAfter(cutoffInstant)
+                    !itemInstant.isBefore(cutoffInstant)
                 } catch (e: Exception) {
                     // Fail-open 전략: 파싱 실패 시 아이템을 포함하여 데이터 손실을 방지한다.
                     // PersistenceService의 중복 검사(externalId)가 이미 중복 저장을 방지하므로,
@@ -172,7 +172,7 @@ class QiitaCrawlerService(
             @Suppress("UNCHECKED_CAST")
             OBJECT_MAPPER.readValue(configJson, Map::class.java) as Map<String, Any>
         } catch (e: Exception) {
-            logger.warn { "Failed to parse source config: ${e.message}" }
+            logger.warn(e) { "Failed to parse source config: ${e.message}" }
             emptyMap()
         }
     }

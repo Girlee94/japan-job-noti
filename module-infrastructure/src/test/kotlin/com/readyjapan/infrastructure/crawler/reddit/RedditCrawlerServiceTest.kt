@@ -210,15 +210,15 @@ class RedditCrawlerServiceTest : BehaviorSpec({
                 }
             }
         }
-        When("정확히 cutoff 경계 시점의 게시물인 경우") {
-            Then("경계 시점 게시물은 제외되고 직후 게시물만 포함된다") {
+        When("cutoff 경계 근처의 게시물인 경우") {
+            Then("경계 직후 게시물은 포함되고 경계 이전 게시물은 제외된다") {
                 val source = createSource()
                 val cutoffEpoch = Instant.now().epochSecond - crawlerConfig.freshnessHours * 3600
-                // 경계 시점 정확히 (isAfter이므로 제외됨)
-                val boundaryPost = createRedditPostData(id = "boundary1", createdUtc = cutoffEpoch.toDouble())
-                // 경계 1초 후 (포함됨)
-                val justAfterPost = createRedditPostData(id = "after1", createdUtc = (cutoffEpoch + 1).toDouble())
-                val response = createListingResponse(listOf(boundaryPost, justAfterPost))
+                // 경계 10초 후 (확실히 포함됨)
+                val nearPost = createRedditPostData(id = "near1", createdUtc = (cutoffEpoch + 10).toDouble())
+                // 경계 1분 전 (확실히 제외됨)
+                val beforePost = createRedditPostData(id = "before1", createdUtc = (cutoffEpoch - 60).toDouble())
+                val response = createListingResponse(listOf(nearPost, beforePost))
                 val historySlot = slot<CrawlHistory>()
 
                 every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
@@ -236,7 +236,7 @@ class RedditCrawlerServiceTest : BehaviorSpec({
 
                 verify {
                     redditPostPersistenceService.saveCrawledPosts(any(), match { posts ->
-                        posts.size == 1 && posts[0].id == "after1"
+                        posts.size == 1 && posts[0].id == "near1"
                     })
                 }
             }

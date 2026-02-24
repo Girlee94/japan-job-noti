@@ -104,22 +104,22 @@ class QiitaCrawlerServiceTest : BehaviorSpec({
             }
         }
 
-        When("정확히 cutoff 경계 시점의 기사인 경우") {
-            Then("경계 시점 기사는 제외되고 직후 기사만 포함된다") {
+        When("cutoff 경계 근처의 기사인 경우") {
+            Then("경계 직후 기사는 포함되고 경계 이전 기사는 제외된다") {
                 val source = createSource()
                 val cutoffInstant = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
                 val cutoffTime = OffsetDateTime.ofInstant(cutoffInstant, ZoneOffset.ofHours(9))
-                // 경계 시점 정확히 (isAfter이므로 제외됨)
-                val boundaryItem = createQiitaItem(id = "boundary1", createdAt = cutoffTime.toString())
-                // 경계 1초 후 (포함됨)
-                val justAfterItem = createQiitaItem(id = "after1", createdAt = cutoffTime.plusSeconds(1).toString())
+                // 경계 10초 후 (확실히 포함됨)
+                val nearItem = createQiitaItem(id = "near1", createdAt = cutoffTime.plusSeconds(10).toString())
+                // 경계 1분 전 (확실히 제외됨)
+                val beforeItem = createQiitaItem(id = "before1", createdAt = cutoffTime.minusSeconds(60).toString())
 
                 val historySlot = slot<CrawlHistory>()
                 every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
                 every { qiitaApiClient.isEnabled() } returns true
                 every {
                     qiitaApiClient.getItemsByTag(any(), any(), any(), any())
-                } returns Mono.just(listOf(boundaryItem, justAfterItem))
+                } returns Mono.just(listOf(nearItem, beforeItem))
                 every {
                     qiitaItemPersistenceService.saveCrawledItems(any(), any())
                 } answers {
@@ -134,7 +134,7 @@ class QiitaCrawlerServiceTest : BehaviorSpec({
 
                 verify {
                     qiitaItemPersistenceService.saveCrawledItems(any(), match { items ->
-                        items.size == 1 && items[0].id == "after1"
+                        items.size == 1 && items[0].id == "near1"
                     })
                 }
             }

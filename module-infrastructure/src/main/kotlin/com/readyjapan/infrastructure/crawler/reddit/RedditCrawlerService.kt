@@ -136,7 +136,7 @@ class RedditCrawlerService(
      */
     private fun isWithinFreshnessWindow(postData: RedditPostData, cutoff: Instant): Boolean {
         val postInstant = Instant.ofEpochSecond(postData.createdUtc.toLong())
-        return postInstant.isAfter(cutoff)
+        return !postInstant.isBefore(cutoff)
     }
 
     /**
@@ -186,7 +186,7 @@ class RedditCrawlerService(
             @Suppress("UNCHECKED_CAST")
             OBJECT_MAPPER.readValue(configJson, Map::class.java) as Map<String, Any>
         } catch (e: Exception) {
-            logger.warn { "Failed to parse source config: ${e.message}" }
+            logger.warn(e) { "Failed to parse source config: ${e.message}" }
             emptyMap()
         }
     }
