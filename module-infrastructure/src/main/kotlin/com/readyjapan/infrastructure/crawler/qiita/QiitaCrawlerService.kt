@@ -7,10 +7,15 @@ import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.SourceType
 import com.readyjapan.core.domain.repository.CrawlHistoryRepository
 import com.readyjapan.core.domain.repository.CrawlSourceRepository
+import com.readyjapan.infrastructure.crawler.config.CrawlerConfig
 import com.readyjapan.infrastructure.crawler.qiita.dto.QiitaItemResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 
 private val logger = KotlinLogging.logger {}
 
@@ -27,11 +32,13 @@ class QiitaCrawlerService(
     private val qiitaProperties: QiitaProperties,
     private val crawlSourceRepository: CrawlSourceRepository,
     private val crawlHistoryRepository: CrawlHistoryRepository,
-    private val qiitaItemPersistenceService: QiitaItemPersistenceService
+    private val qiitaItemPersistenceService: QiitaItemPersistenceService,
+    private val crawlerConfig: CrawlerConfig
 ) {
     companion object {
         private val OBJECT_MAPPER = jacksonObjectMapper()
         private const val API_TIMEOUT_SECONDS = 30L
+        private val JST = ZoneId.of("Asia/Tokyo")
     }
 
     /**
@@ -72,13 +79,17 @@ class QiitaCrawlerService(
             val tags = parseTags(config)
             val limit = (config["limit"] as? Number)?.toInt() ?: qiitaProperties.perPage
 
-            logger.info { "Crawling Qiita tags: $tags (limit: $limit per tag)" }
+            // server-side 날짜 필터: JST 기준 freshnessHours 이내 (날짜 단위 올림으로 누락 방지)
+            val freshnessDays = (crawlerConfig.freshnessHours + 23) / 24
+            val createdAfter = LocalDate.now(JST).minusDays(freshnessDays)
+
+            logger.info { "Crawling Qiita tags: $tags (limit: $limit per tag, createdAfter: $createdAfter)" }
 
             // HTTP 호출 (트랜잭션 밖에서 수행)
             val allItems = mutableListOf<QiitaItemResponse>()
             for (tag in tags) {
                 val items = try {
-                    qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit)
+                    qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit, createdAfter = createdAfter)
                         .block(Duration.ofSeconds(API_TIMEOUT_SECONDS))
                 } catch (e: Exception) {
                     logger.warn(e) { "Failed to fetch items for tag: $tag" }
@@ -98,18 +109,30 @@ class QiitaCrawlerService(
             // 중복 제거 (같은 기사가 여러 태그에 걸릴 수 있음)
             val uniqueItems = allItems.distinctBy { it.id }
 
+            // client-side 날짜 필터: 시간 수준 정밀도 검증
+            val cutoffInstant = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
+            val freshItems = uniqueItems.filter { item ->
+                try {
+                    val itemInstant = OffsetDateTime.parse(item.createdAt).toInstant()
+                    itemInstant.isAfter(cutoffInstant)
+                } catch (e: Exception) {
+                    logger.warn(e) { "Failed to parse createdAt '${item.createdAt}' for item ${item.id}, including by default" }
+                    true // 파싱 실패 시 데이터 손실 방지를 위해 포함
+                }
+            }
+
             // DB 저장 (별도 서비스를 통해 트랜잭션 내에서 수행)
-            val (savedCount, updatedCount) = qiitaItemPersistenceService.saveCrawledItems(source, uniqueItems)
+            val (savedCount, updatedCount) = qiitaItemPersistenceService.saveCrawledItems(source, freshItems)
 
             history.complete(
-                itemsFound = uniqueItems.size,
+                itemsFound = freshItems.size,
                 itemsSaved = savedCount,
                 itemsUpdated = updatedCount
             )
 
             logger.info {
                 "Crawl completed for Qiita: " +
-                        "found=${uniqueItems.size}, saved=$savedCount, updated=$updatedCount"
+                        "found=${freshItems.size}, saved=$savedCount, updated=$updatedCount"
             }
 
         } catch (e: Exception) {
