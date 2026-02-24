@@ -1,14 +1,13 @@
 package com.readyjapan.infrastructure.crawler.reddit
 
-import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.entity.CrawlHistory
 import com.readyjapan.core.domain.entity.CrawlSource
 import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.CrawlStatus
 import com.readyjapan.core.domain.entity.enums.SourceType
-import com.readyjapan.core.domain.repository.CommunityPostRepository
 import com.readyjapan.core.domain.repository.CrawlHistoryRepository
 import com.readyjapan.core.domain.repository.CrawlSourceRepository
+import com.readyjapan.infrastructure.crawler.config.CrawlerConfig
 import com.readyjapan.infrastructure.crawler.reddit.dto.RedditListingData
 import com.readyjapan.infrastructure.crawler.reddit.dto.RedditListingResponse
 import com.readyjapan.infrastructure.crawler.reddit.dto.RedditPostData
@@ -23,20 +22,22 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import reactor.core.publisher.Mono
-import java.time.LocalDateTime
+import java.time.Instant
 
 class RedditCrawlerServiceTest : BehaviorSpec({
 
     val redditApiClient = mockk<RedditApiClient>()
     val crawlSourceRepository = mockk<CrawlSourceRepository>()
-    val communityPostRepository = mockk<CommunityPostRepository>()
     val crawlHistoryRepository = mockk<CrawlHistoryRepository>()
+    val redditPostPersistenceService = mockk<RedditPostPersistenceService>()
+    val crawlerConfig = CrawlerConfig()
     val redditCrawlerService = RedditCrawlerService(
-        redditApiClient, crawlSourceRepository, communityPostRepository, crawlHistoryRepository
+        redditApiClient, crawlSourceRepository, crawlHistoryRepository,
+        redditPostPersistenceService, crawlerConfig
     )
 
     beforeEach {
-        clearMocks(redditApiClient, crawlSourceRepository, communityPostRepository, crawlHistoryRepository)
+        clearMocks(redditApiClient, crawlSourceRepository, crawlHistoryRepository, redditPostPersistenceService)
     }
 
     fun createSource(
@@ -60,7 +61,8 @@ class RedditCrawlerServiceTest : BehaviorSpec({
         numComments: Int = 3,
         stickied: Boolean = false,
         locked: Boolean = false,
-        removed: Boolean? = null
+        removed: Boolean? = null,
+        createdUtc: Double = Instant.now().epochSecond.toDouble()
     ): RedditPostData = RedditPostData(
         id = id,
         name = "t3_$id",
@@ -76,8 +78,8 @@ class RedditCrawlerServiceTest : BehaviorSpec({
         score = score,
         upvoteRatio = 0.9,
         numComments = numComments,
-        created = 1700000000.0,
-        createdUtc = 1700000000.0,
+        created = createdUtc,
+        createdUtc = createdUtc,
         linkFlairText = null,
         over18 = false,
         spoiler = false,
@@ -135,15 +137,13 @@ class RedditCrawlerServiceTest : BehaviorSpec({
                     redditApiClient.getSubredditPosts(any(), any(), any(), any())
                 } returns Mono.just(response)
                 every {
-                    communityPostRepository.findBySourceIdAndExternalId(any(), any())
-                } returns null
-                every { communityPostRepository.save(any()) } answers { firstArg() }
-                every { crawlSourceRepository.save(any()) } answers { firstArg() }
+                    redditPostPersistenceService.saveCrawledPosts(any(), any())
+                } returns Pair(1, 0)
 
                 val result = redditCrawlerService.crawlSource(source)
 
                 result.status shouldBe CrawlStatus.SUCCESS
-                result.itemsFound shouldBe result.itemsFound // >= 0 확인
+                result.itemsFound shouldBe 1
             }
         }
         When("API null 응답 시") {
@@ -178,78 +178,95 @@ class RedditCrawlerServiceTest : BehaviorSpec({
                 result.errorMessage!! shouldBe "Connection failed"
             }
         }
-    }
-
-    Given("saveCrawledPosts") {
-        When("새 게시물 저장 시") {
-            Then("saved가 1이고 updated가 0이다") {
+        When("24시간 이전 게시물이 포함된 경우") {
+            Then("오래된 게시물은 필터링되고 최신 게시물만 수집된다") {
                 val source = createSource()
-                val postData = createRedditPostData(id = "new1")
+                val now = Instant.now().epochSecond.toDouble()
+                val twoDaysAgo = (Instant.now().epochSecond - 48 * 3600).toDouble()
 
+                val freshPost = createRedditPostData(id = "fresh1", createdUtc = now)
+                val stalePost = createRedditPostData(id = "stale1", createdUtc = twoDaysAgo)
+                val response = createListingResponse(listOf(freshPost, stalePost))
+                val historySlot = slot<CrawlHistory>()
+
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
                 every {
-                    communityPostRepository.findBySourceIdAndExternalId(source.id, "new1")
-                } returns null
-                every { communityPostRepository.save(any()) } answers { firstArg() }
-                every { crawlSourceRepository.save(any()) } answers { firstArg() }
+                    redditApiClient.getSubredditPosts(any(), any(), any(), any())
+                } returns Mono.just(response)
+                every {
+                    redditPostPersistenceService.saveCrawledPosts(any(), match { it.size == 1 })
+                } returns Pair(1, 0)
 
-                val (saved, updated) = redditCrawlerService.saveCrawledPosts(source, listOf(postData))
+                val result = redditCrawlerService.crawlSource(source)
 
-                saved shouldBe 1
-                updated shouldBe 0
-                verify(exactly = 1) { communityPostRepository.save(any()) }
+                result.status shouldBe CrawlStatus.SUCCESS
+                result.itemsFound shouldBe 1
+                result.itemsSaved shouldBe 1
+
+                verify {
+                    redditPostPersistenceService.saveCrawledPosts(any(), match { posts ->
+                        posts.size == 1 && posts[0].id == "fresh1"
+                    })
+                }
             }
         }
-        When("기존 게시물 통계 업데이트 시") {
-            Then("saved가 0이고 updated가 1이다") {
+        When("cutoff 경계 근처의 게시물인 경우") {
+            Then("경계 직후 게시물은 포함되고 경계 이전 게시물은 제외된다") {
                 val source = createSource()
-                val postData = createRedditPostData(id = "existing1", score = 100, numComments = 50)
-                val existingPost = CommunityPost(
-                    source = source,
-                    externalId = "existing1",
-                    platform = CommunityPlatform.REDDIT,
-                    content = "existing content",
-                    originalUrl = "https://reddit.com/r/japanlife/existing1",
-                    likeCount = 10,
-                    commentCount = 5,
-                    publishedAt = LocalDateTime.of(2026, 1, 1, 12, 0)
-                )
+                val cutoffEpoch = Instant.now().epochSecond - crawlerConfig.freshnessHours * 3600
+                // 경계 10초 후 (확실히 포함됨)
+                val nearPost = createRedditPostData(id = "near1", createdUtc = (cutoffEpoch + 10).toDouble())
+                // 경계 1분 전 (확실히 제외됨)
+                val beforePost = createRedditPostData(id = "before1", createdUtc = (cutoffEpoch - 60).toDouble())
+                val response = createListingResponse(listOf(nearPost, beforePost))
+                val historySlot = slot<CrawlHistory>()
 
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
                 every {
-                    communityPostRepository.findBySourceIdAndExternalId(source.id, "existing1")
-                } returns existingPost
-                every { communityPostRepository.save(any()) } answers { firstArg() }
-                every { crawlSourceRepository.save(any()) } answers { firstArg() }
+                    redditApiClient.getSubredditPosts(any(), any(), any(), any())
+                } returns Mono.just(response)
+                every {
+                    redditPostPersistenceService.saveCrawledPosts(any(), any())
+                } returns Pair(1, 0)
 
-                val (saved, updated) = redditCrawlerService.saveCrawledPosts(source, listOf(postData))
+                val result = redditCrawlerService.crawlSource(source)
 
-                saved shouldBe 0
-                updated shouldBe 1
+                result.status shouldBe CrawlStatus.SUCCESS
+                result.itemsFound shouldBe 1
+
+                verify {
+                    redditPostPersistenceService.saveCrawledPosts(any(), match { posts ->
+                        posts.size == 1 && posts[0].id == "near1"
+                    })
+                }
             }
         }
-        When("통계 동일 시") {
-            Then("스킵한다") {
+        When("모든 게시물이 필터링된 경우") {
+            Then("빈 리스트로 PersistenceService를 호출한다") {
                 val source = createSource()
-                val postData = createRedditPostData(id = "same1", score = 10, numComments = 5)
-                val existingPost = CommunityPost(
-                    source = source,
-                    externalId = "same1",
-                    platform = CommunityPlatform.REDDIT,
-                    content = "existing content",
-                    originalUrl = "https://reddit.com/r/japanlife/same1",
-                    likeCount = 10,
-                    commentCount = 5,
-                    publishedAt = LocalDateTime.of(2026, 1, 1, 12, 0)
-                )
+                val twoDaysAgo = (Instant.now().epochSecond - 48 * 3600).toDouble()
 
+                val stalePost = createRedditPostData(id = "stale1", createdUtc = twoDaysAgo)
+                val response = createListingResponse(listOf(stalePost))
+                val historySlot = slot<CrawlHistory>()
+
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
                 every {
-                    communityPostRepository.findBySourceIdAndExternalId(source.id, "same1")
-                } returns existingPost
-                every { crawlSourceRepository.save(any()) } answers { firstArg() }
+                    redditApiClient.getSubredditPosts(any(), any(), any(), any())
+                } returns Mono.just(response)
+                every {
+                    redditPostPersistenceService.saveCrawledPosts(any(), any())
+                } returns Pair(0, 0)
 
-                val (saved, updated) = redditCrawlerService.saveCrawledPosts(source, listOf(postData))
+                val result = redditCrawlerService.crawlSource(source)
 
-                saved shouldBe 0
-                updated shouldBe 0
+                result.status shouldBe CrawlStatus.SUCCESS
+                result.itemsFound shouldBe 0
+                result.itemsSaved shouldBe 0
+
+                verify {
+                    redditPostPersistenceService.saveCrawledPosts(any(), match { it.isEmpty() })
+                }
             }
         }
     }

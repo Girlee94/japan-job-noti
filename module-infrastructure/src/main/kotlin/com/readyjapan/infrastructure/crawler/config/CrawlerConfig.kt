@@ -19,5 +19,8 @@ data class CrawlerConfig(
     val retryCount: Int = 3,
 
     /** 재시도 간격 (밀리초) */
-    val retryDelayMs: Long = 1000
+    val retryDelayMs: Long = 1000,
+
+    /** 게시물 수집 기준 시간 (시간 단위, 기본 24시간) */
+    val freshnessHours: Long = 24
 )

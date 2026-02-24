@@ -15,6 +15,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono
 import reactor.netty.http.client.HttpClient
 import java.time.Duration
+import java.time.LocalDate
 
 private val logger = KotlinLogging.logger {}
 
@@ -67,24 +68,33 @@ class QiitaApiClient(
      * @param tag 검색할 태그명
      * @param page 페이지 번호 (1부터 시작)
      * @param perPage 페이지당 개수 (최대 100)
+     * @param createdAfter 이 날짜 이후 작성된 기사만 검색 (created:>YYYY-MM-DD)
      */
     fun getItemsByTag(
         tag: String,
         page: Int = 1,
-        perPage: Int = properties.perPage
+        perPage: Int = properties.perPage,
+        createdAfter: LocalDate? = null
     ): Mono<List<QiitaItemResponse>> {
         if (!properties.enabled) {
             logger.info { "Qiita API is disabled" }
             return Mono.just(emptyList())
         }
 
-        logger.debug { "Fetching Qiita items: tag=$tag, page=$page, perPage=$perPage" }
+        val query = buildString {
+            append("tag:$tag")
+            if (createdAfter != null) {
+                append(" created:>$createdAfter")
+            }
+        }
+
+        logger.debug { "Fetching Qiita items: query=$query, page=$page, perPage=$perPage" }
 
         return apiClient.get()
             .uri { builder ->
                 builder
                     .path("/api/v2/items")
-                    .queryParam("query", "tag:$tag")
+                    .queryParam("query", query)
                     .queryParam("page", page)
                     .queryParam("per_page", perPage)
                     .build()
@@ -92,7 +102,7 @@ class QiitaApiClient(
             .retrieve()
             .bodyToMono(object : ParameterizedTypeReference<List<QiitaItemResponse>>() {})
             .doOnNext { items ->
-                logger.info { "Fetched ${items.size} items from Qiita tag:$tag" }
+                logger.info { "Fetched ${items.size} items from Qiita query:$query" }
             }
             .onErrorResume { e ->
                 when (e) {

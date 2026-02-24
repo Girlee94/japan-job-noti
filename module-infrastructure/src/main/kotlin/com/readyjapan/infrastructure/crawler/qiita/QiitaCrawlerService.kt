@@ -7,10 +7,15 @@ import com.readyjapan.core.domain.entity.enums.CommunityPlatform
 import com.readyjapan.core.domain.entity.enums.SourceType
 import com.readyjapan.core.domain.repository.CrawlHistoryRepository
 import com.readyjapan.core.domain.repository.CrawlSourceRepository
+import com.readyjapan.infrastructure.crawler.config.CrawlerConfig
 import com.readyjapan.infrastructure.crawler.qiita.dto.QiitaItemResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 
 private val logger = KotlinLogging.logger {}
 
@@ -27,11 +32,13 @@ class QiitaCrawlerService(
     private val qiitaProperties: QiitaProperties,
     private val crawlSourceRepository: CrawlSourceRepository,
     private val crawlHistoryRepository: CrawlHistoryRepository,
-    private val qiitaItemPersistenceService: QiitaItemPersistenceService
+    private val qiitaItemPersistenceService: QiitaItemPersistenceService,
+    private val crawlerConfig: CrawlerConfig
 ) {
     companion object {
         private val OBJECT_MAPPER = jacksonObjectMapper()
         private const val API_TIMEOUT_SECONDS = 30L
+        private val JST = ZoneId.of("Asia/Tokyo")
     }
 
     /**
@@ -72,13 +79,19 @@ class QiitaCrawlerService(
             val tags = parseTags(config)
             val limit = (config["limit"] as? Number)?.toInt() ?: qiitaProperties.perPage
 
-            logger.info { "Crawling Qiita tags: $tags (limit: $limit per tag)" }
+            // 날짜 필터링 이중화 전략:
+            // - server-side: Qiita API query(`created:>YYYY-MM-DD`)로 불필요한 데이터 전송량 절감
+            // - client-side: 서버/클라이언트 시간 동기화 오차 및 날짜 단위 필터의 시간 정밀도 한계 보완
+            val freshnessDays = (crawlerConfig.freshnessHours + 23) / 24
+            val createdAfter = LocalDate.now(JST).minusDays(freshnessDays)
+
+            logger.info { "Crawling Qiita tags: $tags (limit: $limit per tag, createdAfter: $createdAfter)" }
 
             // HTTP 호출 (트랜잭션 밖에서 수행)
             val allItems = mutableListOf<QiitaItemResponse>()
             for (tag in tags) {
                 val items = try {
-                    qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit)
+                    qiitaApiClient.getItemsByTag(tag, page = 1, perPage = limit, createdAfter = createdAfter)
                         .block(Duration.ofSeconds(API_TIMEOUT_SECONDS))
                 } catch (e: Exception) {
                     logger.warn(e) { "Failed to fetch items for tag: $tag" }
@@ -98,18 +111,34 @@ class QiitaCrawlerService(
             // 중복 제거 (같은 기사가 여러 태그에 걸릴 수 있음)
             val uniqueItems = allItems.distinctBy { it.id }
 
+            // client-side 날짜 필터: 시간 수준 정밀도 검증
+            // server-side는 날짜 단위(YYYY-MM-DD)이므로 시간 경계 근처 아이템이 포함될 수 있음
+            val cutoffInstant = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
+            val freshItems = uniqueItems.filter { item ->
+                try {
+                    val itemInstant = OffsetDateTime.parse(item.createdAt).toInstant()
+                    !itemInstant.isBefore(cutoffInstant)
+                } catch (e: Exception) {
+                    // Fail-open 전략: 파싱 실패 시 아이템을 포함하여 데이터 손실을 방지한다.
+                    // PersistenceService의 중복 검사(externalId)가 이미 중복 저장을 방지하므로,
+                    // 포함해도 사이드 이펙트가 없으며 제외 시 유효한 데이터를 잃을 위험이 있다.
+                    logger.warn(e) { "Failed to parse createdAt '${item.createdAt}' for item ${item.id}, including by default" }
+                    true
+                }
+            }
+
             // DB 저장 (별도 서비스를 통해 트랜잭션 내에서 수행)
-            val (savedCount, updatedCount) = qiitaItemPersistenceService.saveCrawledItems(source, uniqueItems)
+            val (savedCount, updatedCount) = qiitaItemPersistenceService.saveCrawledItems(source, freshItems)
 
             history.complete(
-                itemsFound = uniqueItems.size,
+                itemsFound = freshItems.size,
                 itemsSaved = savedCount,
                 itemsUpdated = updatedCount
             )
 
             logger.info {
                 "Crawl completed for Qiita: " +
-                        "found=${uniqueItems.size}, saved=$savedCount, updated=$updatedCount"
+                        "found=${freshItems.size}, saved=$savedCount, updated=$updatedCount"
             }
 
         } catch (e: Exception) {
@@ -143,7 +172,7 @@ class QiitaCrawlerService(
             @Suppress("UNCHECKED_CAST")
             OBJECT_MAPPER.readValue(configJson, Map::class.java) as Map<String, Any>
         } catch (e: Exception) {
-            logger.warn { "Failed to parse source config: ${e.message}" }
+            logger.warn(e) { "Failed to parse source config: ${e.message}" }
             emptyMap()
         }
     }
