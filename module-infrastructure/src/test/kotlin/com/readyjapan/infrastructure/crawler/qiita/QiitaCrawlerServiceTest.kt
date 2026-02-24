@@ -17,6 +17,8 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import reactor.core.publisher.Mono
+import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
@@ -98,6 +100,79 @@ class QiitaCrawlerServiceTest : BehaviorSpec({
 
                 verify {
                     qiitaItemPersistenceService.saveCrawledItems(any(), match { it.size == 1 })
+                }
+            }
+        }
+
+        When("정확히 cutoff 경계 시점의 기사인 경우") {
+            Then("경계 시점 기사는 제외되고 직후 기사만 포함된다") {
+                val source = createSource()
+                val cutoffInstant = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
+                val cutoffTime = OffsetDateTime.ofInstant(cutoffInstant, ZoneOffset.ofHours(9))
+                // 경계 시점 정확히 (isAfter이므로 제외됨)
+                val boundaryItem = createQiitaItem(id = "boundary1", createdAt = cutoffTime.toString())
+                // 경계 1초 후 (포함됨)
+                val justAfterItem = createQiitaItem(id = "after1", createdAt = cutoffTime.plusSeconds(1).toString())
+
+                val historySlot = slot<CrawlHistory>()
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
+                every { qiitaApiClient.isEnabled() } returns true
+                every {
+                    qiitaApiClient.getItemsByTag(any(), any(), any(), any())
+                } returns Mono.just(listOf(boundaryItem, justAfterItem))
+                every {
+                    qiitaItemPersistenceService.saveCrawledItems(any(), any())
+                } answers {
+                    val items = secondArg<List<QiitaItemResponse>>()
+                    Pair(items.size, 0)
+                }
+
+                val result = qiitaCrawlerService.crawlSource(source)
+
+                result.status shouldBe CrawlStatus.SUCCESS
+                result.itemsFound shouldBe 1
+
+                verify {
+                    qiitaItemPersistenceService.saveCrawledItems(any(), match { items ->
+                        items.size == 1 && items[0].id == "after1"
+                    })
+                }
+            }
+        }
+
+        When("동일 기사가 여러 태그에 걸려 중복 수집된 경우") {
+            Then("distinctBy로 중복이 제거된다") {
+                val source = createSource()
+                val now = OffsetDateTime.now(ZoneOffset.ofHours(9))
+                val duplicateItem1 = createQiitaItem(id = "dup1", createdAt = now.toString())
+                val duplicateItem2 = createQiitaItem(id = "dup1", createdAt = now.toString())
+                val uniqueItem = createQiitaItem(id = "unique1", createdAt = now.toString())
+
+                val historySlot = slot<CrawlHistory>()
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
+                every { qiitaApiClient.isEnabled() } returns true
+                // 첫 번째 태그에서 dup1 + unique1, 두 번째 태그에서 dup1 반환
+                every {
+                    qiitaApiClient.getItemsByTag(eq("日本"), any(), any(), any())
+                } returns Mono.just(listOf(duplicateItem1, uniqueItem))
+                every {
+                    qiitaApiClient.getItemsByTag(eq("就職"), any(), any(), any())
+                } returns Mono.just(listOf(duplicateItem2))
+                every {
+                    qiitaItemPersistenceService.saveCrawledItems(any(), any())
+                } answers {
+                    val items = secondArg<List<QiitaItemResponse>>()
+                    Pair(items.size, 0)
+                }
+
+                val result = qiitaCrawlerService.crawlSource(source)
+
+                result.status shouldBe CrawlStatus.SUCCESS
+                // dup1은 중복 제거되어 2개만 남음
+                result.itemsFound shouldBe 2
+
+                verify {
+                    qiitaItemPersistenceService.saveCrawledItems(any(), match { it.size == 2 })
                 }
             }
         }

@@ -143,6 +143,36 @@ class RedditPostPersistenceServiceTest : BehaviorSpec({
                 updated shouldBe 0
             }
         }
+        When("동일 externalId 게시물이 재수집된 경우") {
+            Then("첫 번째로 업데이트 후 동일 통계인 두 번째는 스킵된다") {
+                val source = createSource()
+                // 동일 ID, 동일 통계 — 첫 번째가 업데이트하면 두 번째는 통계가 같아 스킵
+                val postData1 = createRedditPostData(id = "dup1", score = 50, numComments = 10)
+                val postData2 = createRedditPostData(id = "dup1", score = 50, numComments = 10)
+                val existingPost = CommunityPost(
+                    source = source,
+                    externalId = "dup1",
+                    platform = CommunityPlatform.REDDIT,
+                    content = "existing content",
+                    originalUrl = "https://reddit.com/r/japanlife/dup1",
+                    likeCount = 30,
+                    commentCount = 5,
+                    publishedAt = LocalDateTime.of(2026, 1, 1, 12, 0)
+                )
+
+                every {
+                    communityPostRepository.findAllBySourceIdAndExternalIdIn(source.id, listOf("dup1", "dup1"))
+                } returns listOf(existingPost)
+                every { communityPostRepository.saveAll(any<List<CommunityPost>>()) } answers { firstArg() }
+                every { crawlSourceRepository.save(any()) } answers { firstArg() }
+
+                val (saved, updated) = persistenceService.saveCrawledPosts(source, listOf(postData1, postData2))
+
+                // 첫 번째: 30/5 → 50/10 업데이트, 두 번째: 50/10 == 50/10 스킵
+                saved shouldBe 0
+                updated shouldBe 1
+            }
+        }
         When("빈 게시물 리스트 저장 시") {
             Then("(0, 0)을 반환하고 소스의 lastCrawledAt이 갱신된다") {
                 val source = createSource()

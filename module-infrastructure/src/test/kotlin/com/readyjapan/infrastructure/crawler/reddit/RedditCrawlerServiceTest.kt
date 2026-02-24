@@ -210,6 +210,37 @@ class RedditCrawlerServiceTest : BehaviorSpec({
                 }
             }
         }
+        When("정확히 cutoff 경계 시점의 게시물인 경우") {
+            Then("경계 시점 게시물은 제외되고 직후 게시물만 포함된다") {
+                val source = createSource()
+                val cutoffEpoch = Instant.now().epochSecond - crawlerConfig.freshnessHours * 3600
+                // 경계 시점 정확히 (isAfter이므로 제외됨)
+                val boundaryPost = createRedditPostData(id = "boundary1", createdUtc = cutoffEpoch.toDouble())
+                // 경계 1초 후 (포함됨)
+                val justAfterPost = createRedditPostData(id = "after1", createdUtc = (cutoffEpoch + 1).toDouble())
+                val response = createListingResponse(listOf(boundaryPost, justAfterPost))
+                val historySlot = slot<CrawlHistory>()
+
+                every { crawlHistoryRepository.save(capture(historySlot)) } answers { historySlot.captured }
+                every {
+                    redditApiClient.getSubredditPosts(any(), any(), any(), any())
+                } returns Mono.just(response)
+                every {
+                    redditPostPersistenceService.saveCrawledPosts(any(), any())
+                } returns Pair(1, 0)
+
+                val result = redditCrawlerService.crawlSource(source)
+
+                result.status shouldBe CrawlStatus.SUCCESS
+                result.itemsFound shouldBe 1
+
+                verify {
+                    redditPostPersistenceService.saveCrawledPosts(any(), match { posts ->
+                        posts.size == 1 && posts[0].id == "after1"
+                    })
+                }
+            }
+        }
         When("모든 게시물이 필터링된 경우") {
             Then("빈 리스트로 PersistenceService를 호출한다") {
                 val source = createSource()

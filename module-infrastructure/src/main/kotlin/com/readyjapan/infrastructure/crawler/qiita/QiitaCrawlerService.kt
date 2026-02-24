@@ -79,7 +79,9 @@ class QiitaCrawlerService(
             val tags = parseTags(config)
             val limit = (config["limit"] as? Number)?.toInt() ?: qiitaProperties.perPage
 
-            // server-side 날짜 필터: JST 기준 freshnessHours 이내 (날짜 단위 올림으로 누락 방지)
+            // 날짜 필터링 이중화 전략:
+            // - server-side: Qiita API query(`created:>YYYY-MM-DD`)로 불필요한 데이터 전송량 절감
+            // - client-side: 서버/클라이언트 시간 동기화 오차 및 날짜 단위 필터의 시간 정밀도 한계 보완
             val freshnessDays = (crawlerConfig.freshnessHours + 23) / 24
             val createdAfter = LocalDate.now(JST).minusDays(freshnessDays)
 
@@ -110,14 +112,18 @@ class QiitaCrawlerService(
             val uniqueItems = allItems.distinctBy { it.id }
 
             // client-side 날짜 필터: 시간 수준 정밀도 검증
+            // server-side는 날짜 단위(YYYY-MM-DD)이므로 시간 경계 근처 아이템이 포함될 수 있음
             val cutoffInstant = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
             val freshItems = uniqueItems.filter { item ->
                 try {
                     val itemInstant = OffsetDateTime.parse(item.createdAt).toInstant()
                     itemInstant.isAfter(cutoffInstant)
                 } catch (e: Exception) {
+                    // Fail-open 전략: 파싱 실패 시 아이템을 포함하여 데이터 손실을 방지한다.
+                    // PersistenceService의 중복 검사(externalId)가 이미 중복 저장을 방지하므로,
+                    // 포함해도 사이드 이펙트가 없으며 제외 시 유효한 데이터를 잃을 위험이 있다.
                     logger.warn(e) { "Failed to parse createdAt '${item.createdAt}' for item ${item.id}, including by default" }
-                    true // 파싱 실패 시 데이터 손실 방지를 위해 포함
+                    true
                 }
             }
 

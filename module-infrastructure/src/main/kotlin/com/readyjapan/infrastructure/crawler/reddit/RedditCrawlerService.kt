@@ -99,6 +99,7 @@ class RedditCrawlerService(
                 return crawlHistoryRepository.save(history)
             }
 
+            // client-side 날짜 필터 (Reddit API는 server-side 날짜 필터를 지원하지 않음)
             // cutoff를 한 번만 계산하여 모든 게시물에 동일한 기준 적용
             val cutoff = Instant.now().minus(Duration.ofHours(crawlerConfig.freshnessHours))
 
