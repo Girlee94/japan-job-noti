@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.spring") apply false
     kotlin("plugin.jpa") apply false
+    kotlin("kapt") apply false
     id("org.springframework.boot") apply false
     id("io.spring.dependency-management") apply false
 }

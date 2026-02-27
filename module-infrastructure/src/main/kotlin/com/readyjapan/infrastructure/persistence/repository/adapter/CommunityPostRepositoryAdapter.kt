@@ -46,10 +46,10 @@ class CommunityPostRepositoryAdapter(
         jpa.findRecentPosts(limit)
 
     override fun countByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): Int =
-        jpa.countByCreatedAtBetween(start, end)
+        jpa.countByCreatedAtBetween(start, end).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     override fun countBySentiment(sentiment: Sentiment): Int =
-        jpa.countBySentiment(sentiment)
+        jpa.countBySentiment(sentiment).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     override fun save(communityPost: CommunityPost): CommunityPost =
         jpa.save(communityPost)
