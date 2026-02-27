@@ -14,8 +14,8 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
-    // QueryDSL
-    implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
+    // QueryDSL (Q-class 컴파일용, 런타임 의존성은 module-infrastructure)
+    compileOnly("com.querydsl:querydsl-jpa:5.1.0:jakarta")
     kapt("com.querydsl:querydsl-apt:5.1.0:jakarta")
     kapt("jakarta.persistence:jakarta.persistence-api")
     kapt("jakarta.annotation:jakarta.annotation-api")
