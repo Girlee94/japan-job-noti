@@ -32,7 +32,7 @@ class NewsArticleRepositoryAdapter(
         jpa.findByCategory(category)
 
     override fun countByCreatedAtBetween(start: LocalDateTime, end: LocalDateTime): Int =
-        jpa.countByCreatedAtBetween(start, end)
+        jpa.countByCreatedAtBetween(start, end).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     override fun save(newsArticle: NewsArticle): NewsArticle = jpa.save(newsArticle)
 

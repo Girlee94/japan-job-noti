@@ -18,6 +18,9 @@ dependencies {
     // Jsoup for HTML parsing (크롤링)
     implementation("org.jsoup:jsoup:1.18.3")
 
+    // QueryDSL
+    implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
+
     // Jackson for JSON
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

@@ -5,6 +5,7 @@ import com.readyjapan.core.domain.entity.enums.CrawlStatus
 import com.readyjapan.core.domain.repository.CrawlHistoryRepository
 import com.readyjapan.infrastructure.persistence.repository.JpaCrawlHistoryRepository
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 @Repository
@@ -34,6 +35,7 @@ class CrawlHistoryRepositoryAdapter(
 
     override fun deleteById(id: Long) = jpa.deleteById(id)
 
+    @Transactional
     override fun deleteOlderThan(dateTime: LocalDateTime): Int =
-        jpa.deleteOlderThan(dateTime)
+        jpa.deleteOlderThan(dateTime).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 }
