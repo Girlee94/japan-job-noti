@@ -37,5 +37,17 @@ class TranslationSchedulerTest : BehaviorSpec({
                 verify(exactly = 1) { translationOrchestrationService.translatePendingContent() }
             }
         }
+
+        When("예외 발생 시") {
+            Then("예외가 전파되지 않고 알림이 전송된다") {
+                every {
+                    translationOrchestrationService.translatePendingContent()
+                } throws RuntimeException("Translation error")
+
+                translationScheduler.translatePendingContent()
+
+                verify(exactly = 1) { alertService.sendAlert("translation-batch", any(), any()) }
+            }
+        }
     }
 })

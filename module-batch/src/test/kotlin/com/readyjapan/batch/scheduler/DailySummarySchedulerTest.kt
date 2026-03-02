@@ -108,6 +108,7 @@ class DailySummarySchedulerTest : BehaviorSpec({
                 // 결과 상태 검증
                 failureResult.failed shouldBe true
                 failureResult.telegramSent shouldBe false
+                verify(exactly = 1) { alertService.sendAlert("daily-summary", any(), any()) }
             }
         }
     }

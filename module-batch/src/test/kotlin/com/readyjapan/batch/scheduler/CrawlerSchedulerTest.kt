@@ -89,12 +89,13 @@ class CrawlerSchedulerTest : BehaviorSpec({
 
     Given("scheduledRedditCrawl") {
         When("예외 발생 시") {
-            Then("예외가 전파되지 않는다") {
+            Then("예외가 전파되지 않고 알림이 전송된다") {
                 every { redditCrawlerService.crawlAllSources() } throws RuntimeException("Unexpected error")
 
                 crawlerScheduler.scheduledRedditCrawl()
 
                 verify(exactly = 1) { redditCrawlerService.crawlAllSources() }
+                verify(exactly = 1) { alertService.sendAlert("reddit-crawl", any(), any()) }
             }
         }
     }

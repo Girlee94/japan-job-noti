@@ -25,7 +25,9 @@ class AlertService(
         }
 
         val message = buildMessage(title, detail)
-        val sent = telegramClient.sendMessageSync(message)
+        val sent = runCatching { telegramClient.sendMessageSync(message) }
+            .onFailure { e -> logger.warn(e) { "장애 알림 전송 중 예외: $alertKey" } }
+            .getOrDefault(false)
 
         if (sent) {
             lastAlertTimes[alertKey] = Instant.now()
@@ -45,7 +47,7 @@ class AlertService(
         sb.appendLine("*[Alert] ${escapeMarkdown(title)}*")
         if (!detail.isNullOrBlank()) {
             val truncated = if (detail.length > MAX_DETAIL_LENGTH) {
-                detail.take(MAX_DETAIL_LENGTH) + "..."
+                detail.take(MAX_DETAIL_LENGTH - 3) + "..."
             } else {
                 detail
             }

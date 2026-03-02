@@ -36,5 +36,17 @@ class SentimentAnalysisSchedulerTest : BehaviorSpec({
                 verify(exactly = 1) { sentimentOrchestrationService.analyzePendingSentiments() }
             }
         }
+
+        When("예외 발생 시") {
+            Then("예외가 전파되지 않고 알림이 전송된다") {
+                every {
+                    sentimentOrchestrationService.analyzePendingSentiments()
+                } throws RuntimeException("Analysis error")
+
+                sentimentAnalysisScheduler.analyzePendingSentiments()
+
+                verify(exactly = 1) { alertService.sendAlert("sentiment-batch", any(), any()) }
+            }
+        }
     }
 })

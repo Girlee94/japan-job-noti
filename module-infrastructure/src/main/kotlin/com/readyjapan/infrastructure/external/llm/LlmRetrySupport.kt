@@ -14,17 +14,25 @@ fun <T> retryOnTransientError(
     operationName: String = "LLM API",
     operation: () -> T?
 ): T? {
+    require(maxRetries >= 0) { "maxRetries must be >= 0" }
+    require(initialDelayMs > 0) { "initialDelayMs must be > 0" }
+
     for (attempt in 0..maxRetries) {
         try {
             return operation()
         } catch (e: Exception) {
             if (attempt < maxRetries && isTransientError(e)) {
                 val delayMs = initialDelayMs * (1L shl attempt)
-                logger.warn {
+                logger.warn(e) {
                     "$operationName 호출 실패 (시도 ${attempt + 1}/${maxRetries + 1}), " +
                         "${delayMs}ms 후 재시도: ${e.message}"
                 }
-                Thread.sleep(delayMs)
+                try {
+                    Thread.sleep(delayMs)
+                } catch (ie: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw ie
+                }
             } else {
                 throw e
             }
