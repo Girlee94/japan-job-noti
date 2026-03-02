@@ -1,7 +1,7 @@
 package com.readyjapan.api.controller
 
+import com.readyjapan.api.controller.dto.CommunityPostResponse
 import com.readyjapan.core.common.response.ApiResponse
-import com.readyjapan.core.domain.entity.CommunityPost
 import com.readyjapan.core.domain.repository.CommunityPostRepository
 import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
@@ -98,37 +98,4 @@ class CrawlerController(
         val failedSources: Int
     )
 
-    data class CommunityPostResponse(
-        val id: Long,
-        val platform: String,
-        val title: String?,
-        val content: String,
-        val author: String?,
-        val originalUrl: String,
-        val likeCount: Int,
-        val commentCount: Int,
-        val sentiment: String?,
-        val language: String,
-        val publishedAt: String,
-        val createdAt: String
-    ) {
-        companion object {
-            fun from(post: CommunityPost): CommunityPostResponse {
-                return CommunityPostResponse(
-                    id = post.id,
-                    platform = post.platform.name,
-                    title = post.getDisplayTitle(),
-                    content = post.getDisplayContent().take(500),
-                    author = post.author,
-                    originalUrl = post.originalUrl,
-                    likeCount = post.likeCount,
-                    commentCount = post.commentCount,
-                    sentiment = post.sentiment?.name,
-                    language = post.language,
-                    publishedAt = post.publishedAt.toString(),
-                    createdAt = post.createdAt.toString()
-                )
-            }
-        }
-    }
 }
