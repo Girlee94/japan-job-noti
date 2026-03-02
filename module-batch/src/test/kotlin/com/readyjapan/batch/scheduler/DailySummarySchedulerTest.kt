@@ -3,12 +3,14 @@ package com.readyjapan.batch.scheduler
 import com.readyjapan.core.domain.entity.DailySummary
 import com.readyjapan.core.domain.entity.enums.SummaryStatus
 import com.readyjapan.infrastructure.external.llm.service.SummaryStats
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import com.readyjapan.infrastructure.orchestration.DailySummaryOrchestrationService
 import com.readyjapan.infrastructure.orchestration.result.DailySummaryGenerationResult
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.clearMocks
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import java.time.LocalDate
@@ -17,10 +19,12 @@ import java.time.ZoneId
 class DailySummarySchedulerTest : BehaviorSpec({
 
     val dailySummaryOrchestrationService = mockk<DailySummaryOrchestrationService>()
-    val dailySummaryScheduler = DailySummaryScheduler(dailySummaryOrchestrationService)
+    val alertService = mockk<AlertService>()
+    val dailySummaryScheduler = DailySummaryScheduler(dailySummaryOrchestrationService, alertService)
 
     beforeEach {
-        clearMocks(dailySummaryOrchestrationService)
+        clearMocks(dailySummaryOrchestrationService, alertService)
+        justRun { alertService.sendAlert(any(), any(), any()) }
     }
 
     Given("generateAndSendDailySummary") {

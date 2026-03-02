@@ -1,5 +1,6 @@
 package com.readyjapan.batch.scheduler
 
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import com.readyjapan.infrastructure.orchestration.TranslationOrchestrationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -13,7 +14,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class TranslationScheduler(
-    private val translationOrchestrationService: TranslationOrchestrationService
+    private val translationOrchestrationService: TranslationOrchestrationService,
+    private val alertService: AlertService
 ) {
 
     /**
@@ -22,10 +24,15 @@ class TranslationScheduler(
     @Scheduled(fixedRate = 1800000) // 30분
     fun translatePendingContent() {
         logger.info { "Starting translation batch job" }
-        val result = translationOrchestrationService.translatePendingContent()
-        logger.info {
-            "Translation batch completed - Jobs: ${result.jobPostingsTranslated}, " +
-                    "News: ${result.newsArticlesTranslated}, Community: ${result.communityPostsTranslated}"
+        try {
+            val result = translationOrchestrationService.translatePendingContent()
+            logger.info {
+                "Translation batch completed - Jobs: ${result.jobPostingsTranslated}, " +
+                        "News: ${result.newsArticlesTranslated}, Community: ${result.communityPostsTranslated}"
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Translation batch failed" }
+            alertService.sendAlert("translation-batch", "번역 배치 실패", e.message ?: e::class.simpleName)
         }
     }
 }

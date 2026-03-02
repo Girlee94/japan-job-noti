@@ -1,20 +1,24 @@
 package com.readyjapan.batch.scheduler
 
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import com.readyjapan.infrastructure.orchestration.SentimentOrchestrationService
 import com.readyjapan.infrastructure.orchestration.result.SentimentBatchResult
 import io.kotest.core.spec.style.BehaviorSpec
 import io.mockk.clearMocks
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 
 class SentimentAnalysisSchedulerTest : BehaviorSpec({
 
     val sentimentOrchestrationService = mockk<SentimentOrchestrationService>()
-    val sentimentAnalysisScheduler = SentimentAnalysisScheduler(sentimentOrchestrationService)
+    val alertService = mockk<AlertService>()
+    val sentimentAnalysisScheduler = SentimentAnalysisScheduler(sentimentOrchestrationService, alertService)
 
     beforeEach {
-        clearMocks(sentimentOrchestrationService)
+        clearMocks(sentimentOrchestrationService, alertService)
+        justRun { alertService.sendAlert(any(), any(), any()) }
     }
 
     Given("analyzePendingSentiments") {

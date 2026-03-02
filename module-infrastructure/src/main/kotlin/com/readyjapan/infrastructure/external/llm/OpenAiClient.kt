@@ -55,14 +55,16 @@ class OpenAiClient(
         )
 
         return try {
-            val response = webClient.post()
-                .uri("/chat/completions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${llmProperties.apiKey}")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono<OpenAiChatResponse>()
-                .timeout(Duration.ofSeconds(llmProperties.timeoutSeconds))
-                .block()
+            val response = retryOnTransientError(operationName = "OpenAI") {
+                webClient.post()
+                    .uri("/chat/completions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer ${llmProperties.apiKey}")
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono<OpenAiChatResponse>()
+                    .timeout(Duration.ofSeconds(llmProperties.timeoutSeconds))
+                    .block()
+            }
 
             val content = response?.choices?.firstOrNull()?.message?.content
 
