@@ -460,71 +460,125 @@ val result = postings.asSequence()
 
 ## 8. 테스트 규칙
 
-### 8.1 테스트 네이밍
+### 8.1 테스트 프레임워크
 
-```kotlin
-class JobPostingServiceTest {
+**Kotest BehaviorSpec** + **MockK**를 사용한다.
 
-    @Test
-    fun `findById - 존재하는 ID로 조회하면 JobPosting을 반환한다`() {
-        // given
-        // when
-        // then
-    }
-
-    @Test
-    fun `findById - 존재하지 않는 ID로 조회하면 EntityNotFoundException을 던진다`() {
-        // given
-        // when
-        // then
-    }
-}
-```
+| 라이브러리 | 용도 |
+|-----------|------|
+| Kotest BehaviorSpec | Given/When/Then 구조의 테스트 DSL |
+| MockK | Mock 객체 생성 (`mockk<T>()`) |
+| Kotest Matchers | 검증 (`shouldBe`, `shouldHaveSize` 등) |
 
 ### 8.2 테스트 구조
 
 ```kotlin
-@Test
-fun `메서드명 - 조건 - 기대결과`() {
-    // given: 테스트 데이터 준비
-    val request = CreateJobPostingRequest(
-        title = "Backend Developer",
-        companyName = "Tech Corp"
+class JobPostingServiceTest : BehaviorSpec({
+
+    // Mock 선언: mockk<T>() 직접 생성
+    val repository = mockk<JobPostingRepository>()
+    val service = JobPostingService(repository)
+
+    // 매 테스트 전 Mock 초기화
+    beforeEach {
+        clearMocks(repository)
+    }
+
+    // 테스트 헬퍼 함수
+    fun createJob(id: Long = 1L): JobPosting = JobPosting(
+        id = id,
+        source = createSource(),
+        externalId = "job$id",
+        title = "Software Engineer $id",
+        companyName = "Tech Corp",
+        originalUrl = "https://example.com/job$id"
     )
 
-    // when: 테스트 대상 실행
-    val result = service.create(request)
+    // Given(대상) → When(조건) → Then(기대결과)
+    Given("findById") {
+        When("존재하는 ID로 조회 시") {
+            Then("JobPosting을 반환한다") {
+                val expected = createJob(1L)
+                every { repository.findById(1L) } returns expected
 
-    // then: 결과 검증
-    assertThat(result.title).isEqualTo("Backend Developer")
-    assertThat(result.companyName).isEqualTo("Tech Corp")
-}
+                val result = service.findById(1L)
+
+                result.id shouldBe 1L
+                result.title shouldBe "Software Engineer 1"
+            }
+        }
+        When("존재하지 않는 ID로 조회 시") {
+            Then("EntityNotFoundException이 발생한다") {
+                every { repository.findById(999L) } returns null
+
+                shouldThrow<EntityNotFoundException> {
+                    service.findById(999L)
+                }
+            }
+        }
+    }
+})
 ```
 
 ### 8.3 Mocking (MockK 사용)
 
 ```kotlin
-@ExtendWith(MockKExtension::class)
-class JobPostingServiceTest {
+import io.mockk.clearMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 
-    @MockK
-    private lateinit var repository: JobPostingRepository
+// Mock 생성: mockk<T>() 직접 생성 방식
+val repository = mockk<JobPostingRepository>()
 
-    @InjectMockKs
-    private lateinit var service: JobPostingService
+// 생성자 주입으로 테스트 대상에 전달
+val service = JobPostingService(repository)
 
-    @Test
-    fun `findById 테스트`() {
-        // given
-        val expected = JobPosting(id = 1L, title = "Test", companyName = "Corp")
-        every { repository.findById(1L) } returns expected
+// 매 테스트 전 초기화 (beforeEach 블록 내)
+clearMocks(repository)
 
-        // when
-        val result = service.findById(1L)
+// Stubbing
+every { repository.findById(1L) } returns expected
+every { repository.findAllByStatus(any()) } returns listOf(job1, job2)
+every { repository.save(any()) } answers { firstArg() }
 
-        // then
-        assertThat(result).isEqualTo(expected)
-        verify(exactly = 1) { repository.findById(1L) }
+// 호출 검증 (필요 시)
+verify(exactly = 1) { repository.findById(1L) }
+```
+
+### 8.4 검증 (Kotest Matchers)
+
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.assertions.throwables.shouldThrow
+
+// 값 검증
+response.success shouldBe true
+response.data shouldNotBe null
+response.data!!.id shouldBe 1L
+
+// 컬렉션 검증
+response.data!! shouldHaveSize 2
+
+// 예외 검증
+shouldThrow<EntityNotFoundException> {
+    service.findById(999L)
+}
+```
+
+### 8.5 테스트 네이밍
+
+Given/When/Then 블록의 이름은 **한글**로 작성하여 가독성을 높인다.
+
+```kotlin
+Given("getJobs") {
+    When("기본 상태(ACTIVE)로 조회 시") {
+        Then("활성 채용공고 목록을 반환한다") { ... }
+    }
+    When("존재하지 않는 ID로 조회 시") {
+        Then("EntityNotFoundException이 발생한다") { ... }
     }
 }
 ```
