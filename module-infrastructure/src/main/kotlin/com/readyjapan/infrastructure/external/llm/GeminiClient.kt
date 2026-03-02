@@ -54,18 +54,20 @@ class GeminiClient(
         )
 
         return try {
-            val response = webClient.post()
-                .uri { uriBuilder ->
-                    uriBuilder
-                        .path("/models/{model}:generateContent")
-                        .build(mapOf("model" to llmProperties.model))
-                }
-                .header("x-goog-api-key", llmProperties.apiKey)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono<GeminiGenerateResponse>()
-                .timeout(Duration.ofSeconds(llmProperties.timeoutSeconds))
-                .block()
+            val response = retryOnTransientError(operationName = "Gemini") {
+                webClient.post()
+                    .uri { uriBuilder ->
+                        uriBuilder
+                            .path("/models/{model}:generateContent")
+                            .build(mapOf("model" to llmProperties.model))
+                    }
+                    .header("x-goog-api-key", llmProperties.apiKey)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono<GeminiGenerateResponse>()
+                    .timeout(Duration.ofSeconds(llmProperties.timeoutSeconds))
+                    .block()
+            }
 
             val content = response?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
 

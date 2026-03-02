@@ -1,20 +1,24 @@
 package com.readyjapan.batch.scheduler
 
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import com.readyjapan.infrastructure.orchestration.SentimentOrchestrationService
 import com.readyjapan.infrastructure.orchestration.result.SentimentBatchResult
 import io.kotest.core.spec.style.BehaviorSpec
 import io.mockk.clearMocks
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 
 class SentimentAnalysisSchedulerTest : BehaviorSpec({
 
     val sentimentOrchestrationService = mockk<SentimentOrchestrationService>()
-    val sentimentAnalysisScheduler = SentimentAnalysisScheduler(sentimentOrchestrationService)
+    val alertService = mockk<AlertService>()
+    val sentimentAnalysisScheduler = SentimentAnalysisScheduler(sentimentOrchestrationService, alertService)
 
     beforeEach {
-        clearMocks(sentimentOrchestrationService)
+        clearMocks(sentimentOrchestrationService, alertService)
+        justRun { alertService.sendAlert(any(), any(), any()) }
     }
 
     Given("analyzePendingSentiments") {
@@ -30,6 +34,18 @@ class SentimentAnalysisSchedulerTest : BehaviorSpec({
                 sentimentAnalysisScheduler.analyzePendingSentiments()
 
                 verify(exactly = 1) { sentimentOrchestrationService.analyzePendingSentiments() }
+            }
+        }
+
+        When("예외 발생 시") {
+            Then("예외가 전파되지 않고 알림이 전송된다") {
+                every {
+                    sentimentOrchestrationService.analyzePendingSentiments()
+                } throws RuntimeException("Analysis error")
+
+                sentimentAnalysisScheduler.analyzePendingSentiments()
+
+                verify(exactly = 1) { alertService.sendAlert("sentiment-batch", any(), any()) }
             }
         }
     }

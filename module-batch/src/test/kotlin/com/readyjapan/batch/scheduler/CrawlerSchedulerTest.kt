@@ -7,10 +7,12 @@ import com.readyjapan.core.domain.entity.enums.CrawlStatus
 import com.readyjapan.core.domain.entity.enums.SourceType
 import com.readyjapan.infrastructure.crawler.qiita.QiitaCrawlerService
 import com.readyjapan.infrastructure.crawler.reddit.RedditCrawlerService
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.mockk.clearMocks
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 
@@ -18,9 +20,13 @@ class CrawlerSchedulerTest : BehaviorSpec({
 
     val redditCrawlerService = mockk<RedditCrawlerService>()
     val qiitaCrawlerService = mockk<QiitaCrawlerService>()
-    val crawlerScheduler = CrawlerScheduler(redditCrawlerService, qiitaCrawlerService)
+    val alertService = mockk<AlertService>()
+    val crawlerScheduler = CrawlerScheduler(redditCrawlerService, qiitaCrawlerService, alertService)
 
-    beforeEach { clearMocks(redditCrawlerService, qiitaCrawlerService) }
+    beforeEach {
+        clearMocks(redditCrawlerService, qiitaCrawlerService, alertService)
+        justRun { alertService.sendAlert(any(), any(), any()) }
+    }
 
     fun createSource(): CrawlSource = CrawlSource(
         id = 1L,
@@ -83,12 +89,13 @@ class CrawlerSchedulerTest : BehaviorSpec({
 
     Given("scheduledRedditCrawl") {
         When("예외 발생 시") {
-            Then("예외가 전파되지 않는다") {
+            Then("예외가 전파되지 않고 알림이 전송된다") {
                 every { redditCrawlerService.crawlAllSources() } throws RuntimeException("Unexpected error")
 
                 crawlerScheduler.scheduledRedditCrawl()
 
                 verify(exactly = 1) { redditCrawlerService.crawlAllSources() }
+                verify(exactly = 1) { alertService.sendAlert("reddit-crawl", any(), any()) }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.readyjapan.batch.scheduler
 
+import com.readyjapan.infrastructure.external.telegram.AlertService
 import com.readyjapan.infrastructure.orchestration.DailySummaryOrchestrationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -15,7 +16,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class DailySummaryScheduler(
-    private val dailySummaryOrchestrationService: DailySummaryOrchestrationService
+    private val dailySummaryOrchestrationService: DailySummaryOrchestrationService,
+    private val alertService: AlertService
 ) {
 
     /**
@@ -26,16 +28,27 @@ class DailySummaryScheduler(
         val yesterday = LocalDate.now(ZoneId.of("Asia/Tokyo")).minusDays(1)
         logger.info { "Starting daily summary generation for: $yesterday" }
 
-        val result = dailySummaryOrchestrationService.generateAndSendDailySummary(
-            targetDate = yesterday,
-            skipIfExists = true
-        )
+        try {
+            val result = dailySummaryOrchestrationService.generateAndSendDailySummary(
+                targetDate = yesterday,
+                skipIfExists = true
+            )
 
-        when {
-            result.skipped -> logger.info { "Daily summary skipped: ${result.skippedReason}" }
-            result.failed -> logger.error { "Daily summary failed: ${result.errorMessage}" }
-            result.telegramSent -> logger.info { "Daily summary generated and sent successfully" }
-            else -> logger.warn { "Daily summary generated but Telegram send failed" }
+            when {
+                result.skipped -> logger.info { "Daily summary skipped: ${result.skippedReason}" }
+                result.failed -> {
+                    logger.error { "Daily summary failed: ${result.errorMessage}" }
+                    alertService.sendAlert("daily-summary", "일간 요약 생성 실패", result.errorMessage)
+                }
+                result.telegramSent -> logger.info { "Daily summary generated and sent successfully" }
+                else -> {
+                    logger.warn { "Daily summary generated but Telegram send failed" }
+                    alertService.sendAlert("daily-summary-telegram", "일간 요약 텔레그램 전송 실패")
+                }
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Daily summary scheduler failed" }
+            alertService.sendAlert("daily-summary-exception", "일간 요약 스케줄러 실패", e.message ?: e::class.simpleName)
         }
     }
 }
