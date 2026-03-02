@@ -25,8 +25,9 @@ class DashboardService(
 ) {
 
     fun getStats(): DashboardStatsResponse {
-        val todayStart = LocalDateTime.of(LocalDate.now(), LocalTime.MIN)
-        val todayEnd = LocalDateTime.of(LocalDate.now(), LocalTime.MAX)
+        val today = LocalDate.now()
+        val todayStart = today.atStartOfDay()
+        val todayEnd = LocalDateTime.of(today, LocalTime.MAX)
 
         val todayPosts = communityPostRepository.countByCreatedAtBetween(todayStart, todayEnd)
         val todayJobs = jobPostingRepository.countByCreatedAtBetween(todayStart, todayEnd)
@@ -40,7 +41,11 @@ class DashboardService(
             todayNewsArticles = todayNews,
             latestSummary = latestSummary?.let { DailySummaryResponse.from(it) },
             activeSources = enabledSources.size,
-            recentCrawlStatus = if (enabledSources.all { it.lastCrawledAt != null }) "정상" else "일부 미실행"
+            recentCrawlStatus = when {
+                enabledSources.isEmpty() -> "소스 없음"
+                enabledSources.all { it.lastCrawledAt != null } -> "정상"
+                else -> "일부 미실행"
+            }
         )
     }
 
