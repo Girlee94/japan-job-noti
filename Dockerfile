@@ -17,8 +17,7 @@ COPY module-batch/build.gradle.kts module-batch/
 COPY module-api/build.gradle.kts module-api/
 
 # 의존성 다운로드 (캐시 레이어)
-# 일부 설정이 불완전하여 실패할 수 있으므로 exit 0으로 허용
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon; exit 0
+RUN chmod +x gradlew && ./gradlew dependencies --no-daemon --continue || true
 
 # 소스 코드 복사
 COPY module-core/src module-core/src
@@ -40,7 +39,8 @@ FROM eclipse-temurin:21-jre-alpine AS api
 LABEL org.opencontainers.image.source="https://github.com/Girlee94/ready-japan"
 LABEL org.opencontainers.image.description="Ready Japan API Service"
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache curl ca-certificates && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 

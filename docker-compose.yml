@@ -35,7 +35,7 @@ services:
       DB_PASSWORD: postgres
       SPRING_PROFILES_ACTIVE: local
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -61,6 +61,11 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       SPRING_PROFILES_ACTIVE: local
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'java.*app.jar' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
