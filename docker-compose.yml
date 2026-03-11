@@ -15,6 +15,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api:
     build:
@@ -44,12 +51,21 @@ services:
       resources:
         limits:
           memory: 512M
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   batch:
     build:
       context: .
       target: batch
     restart: unless-stopped
+    ports:
+      - "8081:8081"
     depends_on:
       db:
         condition: service_healthy
@@ -62,14 +78,26 @@ services:
       DB_PASSWORD: postgres
       SPRING_PROFILES_ACTIVE: local
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'java.*app.jar' || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health/readiness || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
           memory: 512M
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   postgres_data:

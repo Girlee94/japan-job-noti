@@ -32,6 +32,24 @@ spring:
     show-sql: false
     open-in-view: false
 
+server:
+  port: ${BATCH_SERVER_PORT:8081}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+
 app:
   qiita:
     enabled: ${QIITA_ENABLED:true}
