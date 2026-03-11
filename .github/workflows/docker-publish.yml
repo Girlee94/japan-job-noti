@@ -96,12 +96,25 @@ jobs:
     environment: production
 
     steps:
+      - name: Determine image tag
+        id: image-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+            echo "tag=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to OCI
         uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: IMAGE_TAG
           script: |
             set -e
 
@@ -110,12 +123,14 @@ jobs:
             # GHCR 로그인
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
+            # IMAGE_TAG 설정 및 .env에 기록
+            export IMAGE_TAG="${IMAGE_TAG}"
+            sed -i '/^IMAGE_TAG=/d' .env 2>/dev/null || true
+            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
+            echo "Deploying image tag: ${IMAGE_TAG}"
+
             # 최신 이미지 Pull
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api batch
-
-            # 현재 이미지 백업 (롤백용)
-            CURRENT_API=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml images api -q 2>/dev/null || true)
-            CURRENT_BATCH=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml images batch -q 2>/dev/null || true)
 
             # API Rolling Update
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api

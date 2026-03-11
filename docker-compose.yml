@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16-alpine
+    profiles:
+      - local
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -33,6 +35,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+        required: false
     env_file:
       - path: .env
         required: false
@@ -64,11 +67,12 @@ services:
       context: .
       target: batch
     restart: unless-stopped
-    ports:
-      - "8081:8081"
+    expose:
+      - "8081"
     depends_on:
       db:
         condition: service_healthy
+        required: false
     env_file:
       - path: .env
         required: false

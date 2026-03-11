@@ -1,17 +1,10 @@
-# Production override (OCI): docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-# 프로덕션에서는 외부 DB(Supabase) 사용 → 로컬 DB 비활성화
+# Production override (OCI): IMAGE_TAG=abc123 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# 프로덕션에서는 외부 DB(Supabase) 사용 → db는 local 프로필에만 포함되어 자동 제외
 services:
-  db:
-    deploy:
-      replicas: 0
-
   api:
-    image: ghcr.io/girlee94/ready-japan-api:latest
+    image: ghcr.io/girlee94/ready-japan-api:${IMAGE_TAG:-latest}
     restart: always
-    depends_on:
-      db:
-        condition: service_started
-        required: false
+    depends_on: {}
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DB_USERNAME: ${DB_USERNAME}
@@ -37,12 +30,9 @@ services:
           memory: 512M
 
   batch:
-    image: ghcr.io/girlee94/ready-japan-batch:latest
+    image: ghcr.io/girlee94/ready-japan-batch:${IMAGE_TAG:-latest}
     restart: always
-    depends_on:
-      db:
-        condition: service_started
-        required: false
+    depends_on: {}
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DB_USERNAME: ${DB_USERNAME}
