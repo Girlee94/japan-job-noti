@@ -120,6 +120,11 @@ jobs:
 
             cd ${{ secrets.OCI_DEPLOY_PATH }}
 
+            # Compose 파일 동기화 (최신 커밋 반영)
+            git fetch origin main
+            git checkout origin/main -- docker-compose.yml docker-compose.prod.yml
+            echo "Compose files synced to latest"
+
             # GHCR 로그인
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
@@ -157,18 +162,18 @@ jobs:
 
             # Batch Rolling Update
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps batch
-            echo "Waiting for Batch startup..."
-            sleep 20
+            echo "Waiting for Batch startup (start_period: 40s)..."
+            sleep 45
 
-            # Batch 헬스 체크
+            # Batch 헬스 체크 (expose만 사용하므로 컨테이너 내부에서 확인)
             BATCH_HEALTHY=false
-            for i in $(seq 1 12); do
-              if curl -sf http://localhost:8081/actuator/health/readiness > /dev/null 2>&1; then
+            for i in $(seq 1 15); do
+              if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T batch curl -sf http://localhost:8081/actuator/health/readiness > /dev/null 2>&1; then
                 echo "Batch is healthy (attempt $i)"
                 BATCH_HEALTHY=true
                 break
               fi
-              echo "Batch not ready yet (attempt $i/12)..."
+              echo "Batch not ready yet (attempt $i/15)..."
               sleep 5
             done
 
