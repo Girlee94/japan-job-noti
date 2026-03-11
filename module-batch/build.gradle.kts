@@ -9,6 +9,12 @@ dependencies {
     // Spring Boot Starter
     implementation("org.springframework.boot:spring-boot-starter")
 
+    // Actuator (health check, metrics)
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+    // Web (actuator 엔드포인트 노출용)
+    implementation("org.springframework.boot:spring-boot-starter-web")
+
     // Spring Data JPA (트랜잭션 관리)
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 

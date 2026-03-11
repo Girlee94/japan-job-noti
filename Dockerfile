@@ -25,8 +25,8 @@ COPY module-infrastructure/src module-infrastructure/src
 COPY module-batch/src module-batch/src
 COPY module-api/src module-api/src
 
-# bootJar 빌드 (테스트 제외)
-RUN ./gradlew :module-api:bootJar :module-batch:bootJar -x test --no-daemon
+# bootJar 빌드 (테스트 제외, 빌드 캐시 활용)
+RUN ./gradlew :module-api:bootJar :module-batch:bootJar -x test --no-daemon --build-cache
 
 # plain jar 제거 (bootJar만 남김)
 RUN rm -f module-api/build/libs/*-plain.jar module-batch/build/libs/*-plain.jar
@@ -50,9 +50,12 @@ RUN chown -R appuser:appgroup /app
 USER appuser
 
 ENV SPRING_PROFILES_ACTIVE=prod
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health/readiness || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
@@ -64,7 +67,8 @@ FROM eclipse-temurin:21-jre-alpine AS batch
 LABEL org.opencontainers.image.source="https://github.com/Girlee94/ready-japan"
 LABEL org.opencontainers.image.description="Ready Japan Batch Service"
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache curl ca-certificates && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
@@ -74,6 +78,11 @@ RUN chown -R appuser:appgroup /app
 USER appuser
 
 ENV SPRING_PROFILES_ACTIVE=prod
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8081/actuator/health/readiness || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

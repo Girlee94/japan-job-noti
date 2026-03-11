@@ -9,6 +9,9 @@ dependencies {
     // Spring Web
     implementation("org.springframework.boot:spring-boot-starter-web")
 
+    // Actuator (health check, metrics)
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+
     // Spring Data JPA
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 

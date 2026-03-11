@@ -1,4 +1,4 @@
-name: Docker Publish
+name: Docker Publish & Deploy
 
 on:
   workflow_run:
@@ -35,6 +35,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -47,6 +50,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Extract metadata (Batch)
         id: meta-batch
@@ -57,6 +61,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
@@ -64,6 +69,7 @@ jobs:
           context: .
           target: api
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-api.outputs.tags }}
           labels: ${{ steps.meta-api.outputs.labels }}
           cache-from: type=gha
@@ -75,7 +81,109 @@ jobs:
           context: .
           target: batch
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-batch.outputs.tags }}
           labels: ${{ steps.meta-batch.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    environment: production
+
+    steps:
+      - name: Determine image tag
+        id: image-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+            echo "tag=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to OCI
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: IMAGE_TAG
+          script: |
+            set -e
+
+            cd ${{ secrets.OCI_DEPLOY_PATH }}
+
+            # Compose 파일 동기화 (최신 커밋 반영)
+            git fetch origin main
+            git checkout origin/main -- docker-compose.yml docker-compose.prod.yml
+            echo "Compose files synced to latest"
+
+            # GHCR 로그인
+            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+
+            # IMAGE_TAG 설정 및 .env에 기록
+            export IMAGE_TAG="${IMAGE_TAG}"
+            sed -i '/^IMAGE_TAG=/d' .env 2>/dev/null || true
+            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
+            echo "Deploying image tag: ${IMAGE_TAG}"
+
+            # 최신 이미지 Pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api batch
+
+            # API Rolling Update
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api
+            echo "Waiting for API startup..."
+            sleep 20
+
+            # API 헬스 체크
+            API_HEALTHY=false
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:8080/actuator/health/readiness > /dev/null 2>&1; then
+                echo "API is healthy (attempt $i)"
+                API_HEALTHY=true
+                break
+              fi
+              echo "API not ready yet (attempt $i/12)..."
+              sleep 5
+            done
+
+            if [ "$API_HEALTHY" = false ]; then
+              echo "API health check failed! Check logs:"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 api
+              exit 1
+            fi
+
+            # Batch Rolling Update
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps batch
+            echo "Waiting for Batch startup (start_period: 40s)..."
+            sleep 45
+
+            # Batch 헬스 체크 (expose만 사용하므로 컨테이너 내부에서 확인)
+            BATCH_HEALTHY=false
+            for i in $(seq 1 15); do
+              if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T batch curl -sf http://localhost:8081/actuator/health/readiness > /dev/null 2>&1; then
+                echo "Batch is healthy (attempt $i)"
+                BATCH_HEALTHY=true
+                break
+              fi
+              echo "Batch not ready yet (attempt $i/15)..."
+              sleep 5
+            done
+
+            if [ "$BATCH_HEALTHY" = false ]; then
+              echo "Batch health check failed! Check logs:"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 batch
+              exit 1
+            fi
+
+            # 미사용 이미지 정리
+            docker image prune -f
+
+            echo "=== Deploy to OCI completed successfully! ==="
